@@ -72,6 +72,10 @@
 #include <version.h>
 #include <graphics.h>
 
+#ifdef OPT_LUA_SCRIPTING
+#include <lua_api.h>
+#endif
+
 /* xterm uses these X Toolkit resource names, which are exported in array */
 #undef XtNborderWidth
 #undef XtNiconName
@@ -2968,6 +2972,15 @@ main(int argc, char *argv[]ENVP_ARG)
 
     spawnXTerm(term, line_speed);
 
+#ifdef OPT_LUA_SCRIPTING
+    /* Initialize Lua scripting after terminal is set up */
+    if (!lua_xterm_init()) {
+        fprintf(stderr, "Warning: Failed to initialize Lua scripting\n");
+    } else {
+        lua_xterm_call_hook(LUA_HOOK_STARTUP);
+    }
+#endif
+
     /* Child process is out there, let's catch its termination */
 
 #ifdef USE_POSIX_SIGNALS
@@ -5565,6 +5578,12 @@ Exit(int n)
 {
     XtermWidget xw = term;
     TScreen *screen = TScreenOf(xw);
+
+#ifdef OPT_LUA_SCRIPTING
+    /* Clean up Lua scripting */
+    lua_xterm_call_hook(LUA_HOOK_SHUTDOWN);
+    lua_xterm_cleanup();
+#endif
 
 #ifdef USE_UTEMPTER
     DEBUG_MSG("handle:Exit USE_UTEMPTER\n");
