@@ -32,9 +32,15 @@
 
 #ifdef OPT_LUA_SCRIPTING
 
+#ifdef LUA_INCLUDE_PREFIX
+#include LUA_INCLUDE_PREFIX "lua.h"
+#include LUA_INCLUDE_PREFIX "lualib.h"
+#include LUA_INCLUDE_PREFIX "lauxlib.h"
+#else
 #include <lua.h>
 #include <lualib.h>
 #include <lauxlib.h>
+#endif
 
 #define LUA_SCRIPT_DIR_DEFAULT ".xterm/scripts"
 #define LUA_INIT_SCRIPT "init.lua"
@@ -69,7 +75,7 @@ typedef struct {
     time_t last_reload;
 } LuaContext;
 
-typedef struct {
+typedef struct LuaHook {
     int hook_type;
     int ref;
     struct LuaHook *next;

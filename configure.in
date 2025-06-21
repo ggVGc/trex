@@ -1232,14 +1232,38 @@ CF_ARG_ENABLE(lua-scripting,
 AC_MSG_RESULT($enable_lua_scripting)
 
 if test "$enable_lua_scripting" = yes ; then
-	CF_FIND_LIBRARY(lua,
-		[#include <lua.h>],
-		[lua_State *L = luaL_newstate();],
-		lua)
-	if test "$cf_cv_find_library_lua" != no ; then
-		CF_ADD_LIB(lua)
-		AC_CHECK_HEADERS(lua.h lualib.h lauxlib.h)
+	AC_CHECK_LIB([lua], [luaL_newstate], [have_lua=yes], [have_lua=no])
+	if test "$have_lua" = no ; then
+		AC_CHECK_LIB([lua5.3], [luaL_newstate], [have_lua=yes; lua_lib=lua5.3], [have_lua=no])
+	else
+		lua_lib=lua
+	fi
+	if test "$have_lua" = no ; then
+		AC_CHECK_LIB([lua5.2], [luaL_newstate], [have_lua=yes; lua_lib=lua5.2], [have_lua=no])
+	fi
+	if test "$have_lua" = no ; then
+		AC_CHECK_LIB([lua5.1], [luaL_newstate], [have_lua=yes; lua_lib=lua5.1], [have_lua=no])
+	fi
+	
+	if test "$have_lua" = yes ; then
+		AC_CHECK_HEADERS([lua.h lualib.h lauxlib.h], [], [have_lua=no])
+		if test "$have_lua" = no ; then
+			AC_CHECK_HEADERS([lua5.3/lua.h lua5.3/lualib.h lua5.3/lauxlib.h], [have_lua=yes; lua_inc=lua5.3/], [have_lua=no])
+		fi
+		if test "$have_lua" = no ; then
+			AC_CHECK_HEADERS([lua5.2/lua.h lua5.2/lualib.h lua5.2/lauxlib.h], [have_lua=yes; lua_inc=lua5.2/], [have_lua=no])
+		fi
+		if test "$have_lua" = no ; then
+			AC_CHECK_HEADERS([lua5.1/lua.h lua5.1/lualib.h lua5.1/lauxlib.h], [have_lua=yes; lua_inc=lua5.1/], [have_lua=no])
+		fi
+	fi
+	
+	if test "$have_lua" = yes ; then
+		LIBS="$LIBS -l$lua_lib"
 		AC_DEFINE(OPT_LUA_SCRIPTING,1,[Define to 1 to enable Lua scripting support])
+		if test "x$lua_inc" != "x" ; then
+			AC_DEFINE_UNQUOTED(LUA_INCLUDE_PREFIX,"$lua_inc",[Lua include prefix])
+		fi
 		LUA_SRCS="lua_api.c lua_hooks.c lua_config.c lua_utils.c"
 		LUA_OBJS="lua_api.o lua_hooks.o lua_config.o lua_utils.o"
 	else
