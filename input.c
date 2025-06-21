@@ -56,6 +56,10 @@
 
 #include <xterm.h>
 
+#ifdef OPT_LUA_SCRIPTING
+#include <lua_api.h>
+#endif
+
 #include <X11/keysym.h>
 
 #if HAVE_X11_DECKEYSYM_H
@@ -1016,6 +1020,13 @@ Input(XtermWidget xw,
 	return;
 
     lookupKeyData(&kd, xw, event);
+
+#ifdef OPT_LUA_SCRIPTING
+    /* Call key press hook - if it handles the event, return early */
+    if (lua_xterm_is_enabled()) {
+        lua_xterm_call_hook(LUA_HOOK_KEY_PRESS, (int)kd.keysym, (int)evt_state);
+    }
+#endif
 
 #if OPT_MOD_FKEYS
     SET_MIN_MOD(xw, keyboard->modify_now.other_keys);

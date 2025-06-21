@@ -62,6 +62,10 @@
 #include <fontutils.h>
 #include <xstrings.h>
 
+#ifdef OPT_LUA_SCRIPTING
+#include <lua_api.h>
+#endif
+
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
@@ -1114,6 +1118,13 @@ WriteText(XtermWidget xw, Cardinal offset, Cardinal length)
 	   screen->cur_col,
 	   length, visibleIChars(str, length)));
 
+#ifdef OPT_LUA_SCRIPTING
+    /* Call pre-character processing hook */
+    if (length > 0 && lua_xterm_is_enabled()) {
+        lua_xterm_call_hook(LUA_HOOK_CHAR_PRE, (int)str[0], (int)attr_flags);
+    }
+#endif
+
     if (cells + (unsigned) screen->cur_col > (unsigned) MaxCols(screen)) {
 	cells = (unsigned) (MaxCols(screen) - screen->cur_col);
     }
@@ -1204,6 +1215,14 @@ WriteText(XtermWidget xw, Cardinal offset, Cardinal length)
     if (screen->cur_row <= screen->max_row) {
 	setZIconBeep(xw);
     }
+
+#ifdef OPT_LUA_SCRIPTING
+    /* Call post-character processing hook */
+    if (length > 0 && lua_xterm_is_enabled()) {
+        lua_xterm_call_hook(LUA_HOOK_CHAR_POST, (int)str[0], (int)attr_flags);
+    }
+#endif
+
     return;
 }
 

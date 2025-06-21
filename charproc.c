@@ -56,6 +56,10 @@
 #include <version.h>
 #include <xterm.h>
 
+#ifdef OPT_LUA_SCRIPTING
+#include <lua_api.h>
+#endif
+
 #include <X11/Xatom.h>
 #include <X11/Xutil.h>
 #include <X11/Xmu/Atoms.h>

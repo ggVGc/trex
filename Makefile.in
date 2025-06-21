@@ -111,18 +111,21 @@ AUTO_SOURCE	= \
 		VTparse.hin \
 		Tekparse.hin
 
+LUA_SRCS	= @LUA_SRCS@
+LUA_OBJS	= @LUA_OBJS@
+
           SRCS1 = button.c cachedGCs.c charproc.c charsets.c cursor.c \
 	  	  data.c doublechr.c fontutils.c input.c \
 		  keysym2ucs.c linedata.c main.c menu.c misc.c \
 		  print.c ptydata.c scrollback.c \
 		  screen.c scrollbar.c tabs.c util.c version.c xstrings.c \
-		  xtermcap.c VTPrsTbl.c $(EXTRASRC)
+		  xtermcap.c VTPrsTbl.c $(LUA_SRCS) $(EXTRASRC)
           OBJS1 = button$o cachedGCs$o charproc$o charsets$o cursor$o \
 	  	  data$o doublechr$o fontutils$o input$o \
 		  keysym2ucs$o linedata$o main$o menu$o misc$o \
 		  print$o ptydata$o scrollback$o \
 		  screen$o scrollbar$o tabs$o util$o version$o xstrings$o \
-		  xtermcap$o VTPrsTbl$o $(EXTRAOBJ)
+		  xtermcap$o VTPrsTbl$o $(LUA_OBJS) $(EXTRAOBJ)
           SRCS2 = resize.c version.c xstrings.c
           OBJS2 = resize$o version$o xstrings$o
            SRCS = $(SRCS1) $(SRCS2)
