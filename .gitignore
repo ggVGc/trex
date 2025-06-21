@@ -11,3 +11,4 @@ config.status
 minstall
 man2html.tmp
 .claude
+autom4te.cache
