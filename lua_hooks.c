@@ -99,7 +99,7 @@ lua_xterm_unregister_hook(LuaHookType type, int ref)
     }
 }
 
-void
+Boolean
 lua_xterm_call_hook(LuaHookType type, ...)
 {
     LuaHook *hook;
@@ -110,12 +110,12 @@ lua_xterm_call_hook(LuaHookType type, ...)
     Boolean bool_arg;
 
     if (!lua_xterm_is_enabled() || type < 0 || type >= LUA_HOOK_COUNT) {
-        return;
+        return False;
     }
 
     hook = hook_lists[type];
     if (hook == NULL) {
-        return;
+        return False;
     }
 
     va_start(args, type);
@@ -147,11 +147,14 @@ lua_xterm_call_hook(LuaHookType type, ...)
 
         case LUA_HOOK_KEY_PRESS:
         case LUA_HOOK_KEY_RELEASE:
-            int_arg = va_arg(args_copy, int);  /* keysym */
-            int_arg = va_arg(args_copy, int);  /* state */
-            lua_pushinteger(lua_ctx->L, int_arg);
-            argc = 1;
-            break;
+            {
+                int keysym = va_arg(args_copy, int);  /* keysym */
+                int state = va_arg(args_copy, int);   /* state */
+                lua_pushinteger(lua_ctx->L, keysym);
+                lua_pushinteger(lua_ctx->L, state);
+                argc = 2;
+                break;
+            }
 
         case LUA_HOOK_MOUSE_PRESS:
         case LUA_HOOK_MOUSE_RELEASE:
@@ -191,7 +194,7 @@ lua_xterm_call_hook(LuaHookType type, ...)
                     /* Hook handled the event, stop processing */
                     lua_pop(lua_ctx->L, 1);
                     va_end(args);
-                    return;
+                    return True;
                 }
             }
             lua_pop(lua_ctx->L, 1);
@@ -201,6 +204,7 @@ lua_xterm_call_hook(LuaHookType type, ...)
     }
 
     va_end(args);
+    return False;
 }
 
 void

@@ -1024,7 +1024,9 @@ Input(XtermWidget xw,
 #ifdef OPT_LUA_SCRIPTING
     /* Call key press hook - if it handles the event, return early */
     if (lua_xterm_is_enabled()) {
-        lua_xterm_call_hook(LUA_HOOK_KEY_PRESS, (int)kd.keysym, (int)evt_state);
+        if (lua_xterm_call_hook(LUA_HOOK_KEY_PRESS, (int)kd.keysym, (int)evt_state)) {
+            return;
+        }
     }
 #endif
 

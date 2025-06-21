@@ -94,7 +94,7 @@ Boolean lua_xterm_is_enabled(void);
 /* Hook management */
 int lua_xterm_register_hook(LuaHookType type, int ref);
 void lua_xterm_unregister_hook(LuaHookType type, int ref);
-void lua_xterm_call_hook(LuaHookType type, ...);
+Boolean lua_xterm_call_hook(LuaHookType type, ...);
 void lua_xterm_clear_hooks(void);
 
 /* Error handling */
