@@ -178,6 +178,7 @@
 #undef OPT_INPUT_METHOD		/* CF_ARG_DISABLE(input-method) */
 #undef OPT_ISO_COLORS		/* CF_ARG_DISABLE(ansi-color) */
 #undef OPT_LOAD_VTFONTS		/* CF_ARG_ENABLE(load-vt-fonts) */
+#undef OPT_LUA_SCRIPTING	/* CF_ARG_ENABLE(lua-scripting) */
 #undef OPT_LUIT_PROG		/* CF_ARG_ENABLE(luit) */
 #undef OPT_MAXIMIZE		/* CF_ARG_DISABLE(maximize) */
 #undef OPT_MINI_LUIT		/* CF_ARG_ENABLE(mini-luit) */
