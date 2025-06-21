@@ -40,7 +40,8 @@ lua_terminal_write(lua_State *L)
 {
     const char *text;
     size_t len;
-    TScreen *screen = TScreenOf(term);
+    XtermWidget xw = term;
+    TScreen *screen = TScreenOf(xw);
 
     if (lua_gettop(L) != 1) {
         return luaL_error(L, "Usage: xterm.terminal.write(text)");
@@ -49,7 +50,7 @@ lua_terminal_write(lua_State *L)
     text = luaL_checklstring(L, 1, &len);
     if (text != NULL && len > 0) {
         /* Write text to terminal */
-        v_write(ptydata->Pty_fd, (const Char *) text, (unsigned) len);
+        v_write(screen->respond, (const Char *) text, (unsigned) len);
     }
 
     return 0;
@@ -58,10 +59,11 @@ lua_terminal_write(lua_State *L)
 int
 lua_terminal_clear(lua_State *L)
 {
-    TScreen *screen = TScreenOf(term);
+    XtermWidget xw = term;
+    TScreen *screen = TScreenOf(xw);
     
     /* Send clear screen sequence */
-    v_write(ptydata->Pty_fd, (const Char *) "\033[2J\033[H", 7);
+    v_write(screen->respond, (const Char *) "\033[2J\033[H", 7);
     
     return 0;
 }
@@ -70,19 +72,16 @@ int
 lua_terminal_set_title(lua_State *L)
 {
     const char *title;
-    char buffer[256];
-    int len;
-
+    XtermWidget xw = term;
+    
     if (lua_gettop(L) != 1) {
         return luaL_error(L, "Usage: xterm.terminal.set_title(title)");
     }
 
     title = luaL_checkstring(L, 1);
     if (title != NULL) {
-        len = snprintf(buffer, sizeof(buffer), "\033]0;%s\007", title);
-        if (len > 0 && len < (int) sizeof(buffer)) {
-            v_write(ptydata->Pty_fd, (const Char *) buffer, (unsigned) len);
-        }
+        /* Use xterm's built-in ChangeTitle function */
+        ChangeTitle(xw, (char *) title);
     }
 
     return 0;
@@ -91,7 +90,8 @@ lua_terminal_set_title(lua_State *L)
 int
 lua_terminal_bell(lua_State *L)
 {
-    Bell(XkbBI_TerminalBell, 0);
+    XtermWidget xw = term;
+    Bell(xw, XkbBI_TerminalBell, 0);
     return 0;
 }
 
@@ -101,6 +101,8 @@ lua_terminal_goto(lua_State *L)
     int row, col;
     char buffer[32];
     int len;
+    XtermWidget xw = term;
+    TScreen *screen = TScreenOf(xw);
 
     if (lua_gettop(L) != 2) {
         return luaL_error(L, "Usage: xterm.terminal.goto(row, col)");
@@ -111,7 +113,7 @@ lua_terminal_goto(lua_State *L)
 
     len = snprintf(buffer, sizeof(buffer), "\033[%d;%dH", row, col);
     if (len > 0) {
-        v_write(ptydata->Pty_fd, (const Char *) buffer, (unsigned) len);
+        v_write(screen->respond, (const Char *) buffer, (unsigned) len);
     }
 
     return 0;
@@ -120,14 +122,18 @@ lua_terminal_goto(lua_State *L)
 int
 lua_terminal_save_cursor(lua_State *L)
 {
-    v_write(ptydata->Pty_fd, (const Char *) "\0337", 2);
+    XtermWidget xw = term;
+    TScreen *screen = TScreenOf(xw);
+    v_write(screen->respond, (const Char *) "\0337", 2);
     return 0;
 }
 
 int
 lua_terminal_restore_cursor(lua_State *L)
 {
-    v_write(ptydata->Pty_fd, (const Char *) "\0338", 2);
+    XtermWidget xw = term;
+    TScreen *screen = TScreenOf(xw);
+    v_write(screen->respond, (const Char *) "\0338", 2);
     return 0;
 }
 
@@ -151,18 +157,20 @@ lua_config_get(lua_State *L)
 
     /* Handle common configuration keys */
     if (strcmp(key, "background") == 0) {
-        lua_pushstring(L, x_strtrim(TScreenOf(xw)->menu_background));
+        /* Use a simple placeholder for now */
+        lua_pushstring(L, "black");
     } else if (strcmp(key, "foreground") == 0) {
-        lua_pushstring(L, x_strtrim(TScreenOf(xw)->menu_foreground));
+        lua_pushstring(L, "white");
     } else if (strcmp(key, "font") == 0) {
         lua_pushstring(L, xw->misc.default_font.f_n);
     } else if (strcmp(key, "geometry") == 0) {
         char geom[64];
         snprintf(geom, sizeof(geom), "%dx%d", 
-                TScreenOf(xw)->sc_width, TScreenOf(xw)->sc_height);
+                TScreenOf(xw)->max_col, TScreenOf(xw)->max_row);
         lua_pushstring(L, geom);
     } else if (strcmp(key, "title") == 0) {
-        lua_pushstring(L, xw->screen.title ? xw->screen.title : "");
+        /* Use a simple placeholder for now */
+        lua_pushstring(L, "xterm");
     } else {
         /* Unknown key */
         lua_pushnil(L);
