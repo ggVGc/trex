@@ -1,0 +1,13 @@
+*.o
+Makefile
+Tekparse.hin
+xterm
+config.log
+df-install
+resize
+run-tic.sh
+VTparse.hin
+config.status
+minstall
+man2html.tmp
+.claude
