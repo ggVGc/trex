@@ -1,0 +1,11 @@
+The NEWS file was generated from xterm.log.html, which serves as the changelog
+for xterm.
+--------------------------------------------------------------------------------
+                            Patch #400 - 2025/06/15
+
+     * improve configure check for X libraries to reduce duplicates.
+     * amend  fix  for  (Debian  #1084794  to  ensure that non-linedrawing
+       characters are drawn with Xft (report by Robert Ross).
+     * simplify/consolidate copyright notices where those were redundant.
+     * update/improve cleanup of environment variables.
+
