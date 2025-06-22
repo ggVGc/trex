@@ -666,11 +666,14 @@ lua_xterm_draw_command_line(void)
         ld->attribs[col] = 0;
     }
     
-    /* Write prompt in reverse video */
-    for (i = 0; i < prompt_len; i++) {
+    /* Write prompt in reverse video (except the space) */
+    for (i = 0; i < prompt_len - 1; i++) {
         ld->charData[i] = (IChar)prompt[i];
         ld->attribs[i] = INVERSE;
     }
+    /* Write the space without inverse video */
+    ld->charData[prompt_len - 1] = (IChar)' ';
+    ld->attribs[prompt_len - 1] = 0;
     
     lua_xterm_debug("Wrote prompt, command_length=%zu", 
                     lua_ctx->command_length);
