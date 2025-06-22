@@ -56,6 +56,10 @@
 
 #include <xterm.h>
 
+#ifdef OPT_LUA_SCRIPTING
+#include <lua_api.h>
+#endif
+
 #include <X11/keysym.h>
 
 #if HAVE_X11_DECKEYSYM_H
@@ -1016,6 +1020,36 @@ Input(XtermWidget xw,
 	return;
 
     lookupKeyData(&kd, xw, event);
+
+#ifdef OPT_LUA_SCRIPTING
+    /* Handle Lua command mode */
+    if (lua_xterm_is_command_mode()) {
+        /* Special keys in command mode */
+        if (kd.keysym == XK_Escape) {
+            lua_xterm_exit_command_mode();
+            return;
+        } else if (kd.keysym == XK_Return) {
+            lua_xterm_command_mode_execute();
+            return;
+        } else if (kd.keysym == XK_BackSpace || kd.keysym == XK_Delete) {
+            lua_xterm_command_mode_backspace();
+            return;
+        } else if (kd.nbytes > 0 && kd.strbuf[0] >= 32 && kd.strbuf[0] < 127) {
+            /* Regular character input */
+            lua_xterm_command_mode_input(kd.strbuf[0]);
+            return;
+        }
+        /* Ignore other special keys in command mode */
+        return;
+    }
+    
+    /* Call key press hook - if it handles the event, return early */
+    if (lua_xterm_is_enabled()) {
+        if (lua_xterm_call_hook(LUA_HOOK_KEY_PRESS, (int)kd.keysym, (int)evt_state)) {
+            return;
+        }
+    }
+#endif
 
 #if OPT_MOD_FKEYS
     SET_MIN_MOD(xw, keyboard->modify_now.other_keys);
