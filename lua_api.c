@@ -821,15 +821,15 @@ lua_trex_require(lua_State *L)
         return luaL_error(L, "Cannot get current working directory");
     }
 
-    /* Construct module path: cwd/trex_runtime/module_name.lua */
-    path_len = strlen(cwd) + strlen("/trex_runtime/") + strlen(module_name) + strlen(".lua") + 1;
+    /* Construct module path: cwd/runtime/module_name.lua */
+    path_len = strlen(cwd) + strlen("/runtime/") + strlen(module_name) + strlen(".lua") + 1;
     module_path = (char *) malloc(path_len);
     if (module_path == NULL) {
         free(cwd);
         return luaL_error(L, "Out of memory");
     }
 
-    snprintf(module_path, path_len, "%s/trex_runtime/%s.lua", cwd, module_name);
+    snprintf(module_path, path_len, "%s/runtime/%s.lua", cwd, module_name);
     free(cwd);
 
     /* Check if file exists */
@@ -871,8 +871,8 @@ lua_xterm_setup_trex_paths(lua_State *L)
         return;
     }
 
-    /* Create trex_runtime path */
-    path_len = strlen(cwd) + strlen("/trex_runtime/?.lua") + 1;
+    /* Create runtime path */
+    path_len = strlen(cwd) + strlen("/runtime/?.lua") + 1;
     trex_path = (char *) malloc(path_len);
     if (trex_path == NULL) {
         free(cwd);
@@ -880,10 +880,10 @@ lua_xterm_setup_trex_paths(lua_State *L)
         return;
     }
 
-    snprintf(trex_path, path_len, "%s/trex_runtime/?.lua", cwd);
+    snprintf(trex_path, path_len, "%s/runtime/?.lua", cwd);
     free(cwd);
 
-    /* Set up package.path to include trex_runtime directory */
+    /* Set up package.path to include runtime directory */
     lua_getglobal(L, "package");
     if (lua_istable(L, -1)) {
         lua_getfield(L, -1, "path");

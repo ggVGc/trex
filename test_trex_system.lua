@@ -8,7 +8,7 @@ utils.log("Require function working correctly!")
 
 -- Test 2: Verify we're loading from current directory
 print("Test 2: Verifying path resolution")
-print("This should load from ./trex_runtime/")
+print("This should load from ./runtime/")
 
 -- Test 3: Test xterm integration
 print("Test 3: Testing xterm integration")

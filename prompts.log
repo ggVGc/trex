@@ -21,3 +21,6 @@ Add an a function to the Lua API which returns the currently displayed text of i
 
 PROMPT 8:
 Upon startup, the application should load a file from trex_runtime/trex.lua in the current directory. In that file, it should be possible to import other files. All imports should be relative the runtime directory.
+
+PROMPT 9:
+Rename trex_runtime to runtime.

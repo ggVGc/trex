@@ -2,12 +2,12 @@
 
 print("=== Testing Trex Runtime System ===")
 
--- Test 1: Check that we can load trex_runtime modules
-print("\nTest 1: Loading modules from trex_runtime/")
+-- Test 1: Check that we can load runtime modules
+print("\nTest 1: Loading modules from runtime/")
 local success, utils = pcall(require, "utils")
 
 if success then
-    print("✓ Successfully loaded utils module from trex_runtime/")
+    print("✓ Successfully loaded utils module from runtime/")
     
     -- Test module functions
     utils.greet("Test Script")
@@ -25,7 +25,7 @@ print("Current working directory check completed")
 print("\nTest 3: Testing nested relative imports")
 -- This should work if our require system is properly set up
 local success2, result = pcall(function()
-    return require("utils")  -- Should resolve to trex_runtime/utils.lua
+    return require("utils")  -- Should resolve to runtime/utils.lua
 end)
 
 if success2 then
@@ -38,20 +38,20 @@ end
 print("\nTest 4: Checking package.path configuration")
 print("package.path:", package.path)
 
-if string.find(package.path, "trex_runtime") then
-    print("✓ package.path correctly includes trex_runtime")
+if string.find(package.path, "runtime") then
+    print("✓ package.path correctly includes runtime")
 else
-    print("✗ package.path does not include trex_runtime")
+    print("✗ package.path does not include runtime")
 end
 
 -- Test 5: Test loading from different subdirectories
 print("\nTest 5: Testing trex runtime directory structure")
-local runtime_dir_test = io.open("trex_runtime/trex.lua", "r")
+local runtime_dir_test = io.open("runtime/trex.lua", "r")
 if runtime_dir_test then
     runtime_dir_test:close()
-    print("✓ trex_runtime/trex.lua exists and is accessible")
+    print("✓ runtime/trex.lua exists and is accessible")
 else
-    print("✗ Cannot access trex_runtime/trex.lua")
+    print("✗ Cannot access runtime/trex.lua")
 end
 
 print("\n=== Trex Runtime System Test Complete ===")

@@ -42,7 +42,7 @@
 #include <lauxlib.h>
 #endif
 
-#define LUA_SCRIPT_DIR_DEFAULT "trex_runtime"
+#define LUA_SCRIPT_DIR_DEFAULT "runtime"
 #define LUA_INIT_SCRIPT "trex.lua"
 #define LUA_MAX_SCRIPT_SIZE (1024 * 1024)  /* 1MB max script size */
 
