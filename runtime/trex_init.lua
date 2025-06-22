@@ -5,14 +5,14 @@ local utils = require("trex.utils")
 local advanced = require("trex.advanced")
 utils.log("Runtime system initialized!")
 
+local user_config_dir = os.getenv("HOME") .. "/.config/trex"
+
 -- Add user config directory to package.path
 local function setup_user_package_path()
-  local user_config_dir = os.getenv("HOME") .. "/.config/trex"
 
   -- Add user config directory patterns to package.path
   local user_patterns = {
     user_config_dir .. "/?.lua",
-    user_config_dir .. "/?/init.lua"
   }
 
   for _, pattern in ipairs(user_patterns) do
@@ -25,7 +25,6 @@ end
 
 -- Load user scripts (simplified to focus on ~/.config/trex)
 local function load_user_scripts()
-  local user_config_dir = os.getenv("HOME") .. "/.config/trex"
   local init_script = user_config_dir .. "/init.lua"
 
   utils.log("Loading user scripts from " .. user_config_dir)
