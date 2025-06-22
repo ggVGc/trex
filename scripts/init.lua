@@ -19,7 +19,7 @@ xterm.hooks.register("key_press", function(keysym, state)
     
     -- F12: Show a custom message
     if keysym == 65483 then  -- F12 key
-        xterm.terminal.write("\nHello from Lua scripting!\n")
+        xterm.terminal.message("\nHello from Lua scripting!\n")
         xterm.terminal.bell()
         return true
     end
@@ -60,6 +60,6 @@ log("Original title: " .. original_title)
 -- The hooks are still available for additional customization if needed
 
 -- Print a welcome message
-xterm.terminal.write("\n--- XTerm Lua Scripting Active ---\n")
-xterm.terminal.write("Press Ctrl+T to enter Lua command mode, F12 for hello message\n")
-xterm.terminal.write("In command mode: type Lua code, press Enter to execute, Escape to cancel\n\n")
+xterm.terminal.message("--- XTerm Lua Scripting Active ---")
+xterm.terminal.message("Press Ctrl+T to enter Lua command mode, F12 for hello message")
+xterm.terminal.message("In command mode: type Lua code, press Enter to execute, Escape to cancel\n")
