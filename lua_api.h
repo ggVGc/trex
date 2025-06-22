@@ -42,8 +42,8 @@
 #include <lauxlib.h>
 #endif
 
-#define LUA_SCRIPT_DIR_DEFAULT ".xterm/scripts"
-#define LUA_INIT_SCRIPT "init.lua"
+#define LUA_SCRIPT_DIR_DEFAULT "runtime"
+#define LUA_INIT_SCRIPT "trex.lua"
 #define LUA_MAX_SCRIPT_SIZE (1024 * 1024)  /* 1MB max script size */
 
 typedef enum {
@@ -109,8 +109,11 @@ int lua_xterm_safe_call(lua_State *L, int nargs, int nresults);
 
 /* Utility functions */
 char *lua_xterm_get_script_path(const char *filename);
+char *lua_xterm_get_cwd_script_path(const char *filename);
+char *lua_xterm_get_home_script_path(const char *filename);
 int lua_xterm_file_exists(const char *filename);
 char *lua_xterm_get_home_dir(void);
+char *lua_xterm_get_cwd(void);
 
 /* Library registration functions */
 int luaopen_xterm_terminal(lua_State *L);
