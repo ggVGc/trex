@@ -48,7 +48,8 @@ static const char *hook_names[LUA_HOOK_COUNT] = {
     "startup",
     "shutdown",
     "menu_action",
-    "status_update"
+    "status_update",
+    "command_mode"
 };
 
 static LuaHookType lua_hook_name_to_type(const char *name);

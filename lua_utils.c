@@ -213,6 +213,29 @@ lua_events_emit(lua_State *L)
     return 0;
 }
 
+/* Command mode functions */
+
+int
+lua_utils_enter_command_mode(lua_State *L)
+{
+    lua_xterm_enter_command_mode();
+    return 0;
+}
+
+int
+lua_utils_exit_command_mode(lua_State *L)
+{
+    lua_xterm_exit_command_mode();
+    return 0;
+}
+
+int
+lua_utils_is_command_mode(lua_State *L)
+{
+    lua_pushboolean(L, lua_xterm_is_command_mode());
+    return 1;
+}
+
 /* Library registration */
 
 int
@@ -224,6 +247,9 @@ luaopen_xterm_utils(lua_State *L)
         {"timestamp", lua_utils_timestamp},
         {"file_exists", lua_utils_file_exists},
         {"system", lua_utils_system},
+        {"enter_command_mode", lua_utils_enter_command_mode},
+        {"exit_command_mode", lua_utils_exit_command_mode},
+        {"is_command_mode", lua_utils_is_command_mode},
         {NULL, NULL}
     };
 

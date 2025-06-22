@@ -91,6 +91,10 @@ lua_xterm_init(void)
     lua_ctx->error_count = 0;
     lua_ctx->last_reload = time(NULL);
     lua_ctx->initialized = 1;
+    lua_ctx->command_mode = False;
+    lua_ctx->command_buffer = NULL;
+    lua_ctx->command_length = 0;
+    lua_ctx->command_capacity = 0;
 
     lua_xterm_debug("Lua scripting initialized");
 
@@ -122,6 +126,11 @@ lua_xterm_cleanup(void)
     if (lua_ctx->init_script) {
         free(lua_ctx->init_script);
         lua_ctx->init_script = NULL;
+    }
+
+    if (lua_ctx->command_buffer) {
+        free(lua_ctx->command_buffer);
+        lua_ctx->command_buffer = NULL;
     }
 
     lua_ctx->initialized = 0;
@@ -445,6 +454,164 @@ lua_xterm_panic(lua_State *L)
 {
     lua_xterm_error("Lua panic: %s", lua_tostring(L, -1));
     return 0;
+}
+
+/* Command mode implementation */
+
+Boolean
+lua_xterm_is_command_mode(void)
+{
+    return (lua_ctx && lua_ctx->command_mode);
+}
+
+void
+lua_xterm_enter_command_mode(void)
+{
+    if (!lua_ctx || !lua_ctx->enabled) {
+        return;
+    }
+    
+    lua_ctx->command_mode = True;
+    lua_xterm_command_mode_clear();
+    
+    /* Call command mode hook if registered */
+    lua_xterm_call_hook(LUA_HOOK_COMMAND_MODE, "s", "enter");
+    
+    lua_xterm_debug("Entered Lua command mode");
+}
+
+void
+lua_xterm_exit_command_mode(void)
+{
+    if (!lua_ctx) {
+        return;
+    }
+    
+    lua_ctx->command_mode = False;
+    lua_xterm_command_mode_clear();
+    
+    /* Call command mode hook if registered */
+    lua_xterm_call_hook(LUA_HOOK_COMMAND_MODE, "s", "exit");
+    
+    lua_xterm_debug("Exited Lua command mode");
+}
+
+void
+lua_xterm_command_mode_input(int ch)
+{
+    if (!lua_ctx || !lua_ctx->command_mode) {
+        return;
+    }
+    
+    /* Ensure buffer exists */
+    if (!lua_ctx->command_buffer) {
+        lua_ctx->command_capacity = 256;
+        lua_ctx->command_buffer = (char *) malloc(lua_ctx->command_capacity);
+        if (!lua_ctx->command_buffer) {
+            lua_xterm_error("Failed to allocate command buffer");
+            return;
+        }
+        lua_ctx->command_length = 0;
+        lua_ctx->command_buffer[0] = '\0';
+    }
+    
+    /* Grow buffer if needed */
+    if (lua_ctx->command_length + 2 >= lua_ctx->command_capacity) {
+        size_t new_capacity = lua_ctx->command_capacity * 2;
+        char *new_buffer = (char *) realloc(lua_ctx->command_buffer, new_capacity);
+        if (!new_buffer) {
+            lua_xterm_error("Failed to grow command buffer");
+            return;
+        }
+        lua_ctx->command_buffer = new_buffer;
+        lua_ctx->command_capacity = new_capacity;
+    }
+    
+    /* Add character to buffer */
+    lua_ctx->command_buffer[lua_ctx->command_length++] = (char) ch;
+    lua_ctx->command_buffer[lua_ctx->command_length] = '\0';
+    
+    /* Update display */
+    lua_xterm_command_mode_display();
+}
+
+void
+lua_xterm_command_mode_backspace(void)
+{
+    if (!lua_ctx || !lua_ctx->command_mode || !lua_ctx->command_buffer) {
+        return;
+    }
+    
+    if (lua_ctx->command_length > 0) {
+        lua_ctx->command_length--;
+        lua_ctx->command_buffer[lua_ctx->command_length] = '\0';
+        lua_xterm_command_mode_display();
+    }
+}
+
+void
+lua_xterm_command_mode_execute(void)
+{
+    if (!lua_ctx || !lua_ctx->command_mode || !lua_ctx->command_buffer) {
+        return;
+    }
+    
+    if (lua_ctx->command_length == 0) {
+        lua_xterm_exit_command_mode();
+        return;
+    }
+    
+    lua_xterm_debug("Executing Lua command: %s", lua_ctx->command_buffer);
+    
+    /* Execute the command as Lua code */
+    int status = luaL_loadstring(lua_ctx->L, lua_ctx->command_buffer);
+    if (status == LUA_OK) {
+        status = lua_xterm_safe_call(lua_ctx->L, 0, 0);
+    }
+    
+    if (status != LUA_OK) {
+        const char *error = lua_tostring(lua_ctx->L, -1);
+        lua_xterm_error("Command error: %s", error ? error : "unknown error");
+        lua_pop(lua_ctx->L, 1);
+    }
+    
+    /* Exit command mode after execution */
+    lua_xterm_exit_command_mode();
+}
+
+void
+lua_xterm_command_mode_clear(void)
+{
+    if (!lua_ctx || !lua_ctx->command_buffer) {
+        return;
+    }
+    
+    lua_ctx->command_length = 0;
+    lua_ctx->command_buffer[0] = '\0';
+}
+
+const char *
+lua_xterm_get_command_buffer(void)
+{
+    if (!lua_ctx || !lua_ctx->command_buffer) {
+        return "";
+    }
+    
+    return lua_ctx->command_buffer;
+}
+
+void
+lua_xterm_command_mode_display(void)
+{
+    /* This function should update the terminal display with the current command */
+    /* The actual implementation will depend on xterm's display system */
+    if (!lua_ctx || !lua_ctx->command_mode) {
+        return;
+    }
+    
+    /* Call display hook if registered */
+    lua_xterm_call_hook(LUA_HOOK_COMMAND_MODE, "ss", "display", 
+                        lua_ctx->command_buffer ? lua_ctx->command_buffer : "");
 }
 
 #endif /* OPT_LUA_SCRIPTING */

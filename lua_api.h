@@ -61,6 +61,7 @@ typedef enum {
     LUA_HOOK_SHUTDOWN,
     LUA_HOOK_MENU_ACTION,
     LUA_HOOK_STATUS_UPDATE,
+    LUA_HOOK_COMMAND_MODE,
     LUA_HOOK_COUNT
 } LuaHookType;
 
@@ -73,6 +74,10 @@ typedef struct {
     Boolean enabled;
     Boolean debug;
     time_t last_reload;
+    Boolean command_mode;
+    char *command_buffer;
+    size_t command_length;
+    size_t command_capacity;
 } LuaContext;
 
 typedef struct LuaHook {
@@ -159,6 +164,17 @@ void lua_xterm_set_debug(Boolean debug);
 /* Integration with xterm's main loop */
 void lua_xterm_process_events(void);
 void lua_xterm_check_reload(void);
+
+/* Command mode functions */
+Boolean lua_xterm_is_command_mode(void);
+void lua_xterm_enter_command_mode(void);
+void lua_xterm_exit_command_mode(void);
+void lua_xterm_command_mode_input(int ch);
+void lua_xterm_command_mode_backspace(void);
+void lua_xterm_command_mode_execute(void);
+void lua_xterm_command_mode_clear(void);
+const char *lua_xterm_get_command_buffer(void);
+void lua_xterm_command_mode_display(void);
 
 #endif /* OPT_LUA_SCRIPTING */
 
