@@ -63,6 +63,8 @@ lua_terminal_message(lua_State *L)
     size_t len;
     XtermWidget xw = term;
     TScreen *screen = TScreenOf(xw);
+    IChar *buffer;
+    size_t i;
 
     if (lua_gettop(L) != 1) {
         return luaL_error(L, "Usage: xterm.terminal.message(text)");
@@ -70,12 +72,26 @@ lua_terminal_message(lua_State *L)
 
     text = luaL_checklstring(L, 1, &len);
     if (text != NULL && len > 0) {
-        /* Write newline first to separate from shell output */
-        v_write(screen->respond, (const Char *) "\r\n", 2);
-        /* Write message text */
-        v_write(screen->respond, (const Char *) text, (unsigned) len);
-        /* Write newline after message */
-        v_write(screen->respond, (const Char *) "\r\n", 2);
+        /* Move to beginning of line and then to next line */
+        CarriageReturn(xw);
+        xtermIndex(xw, 1);
+        
+        /* Convert text to IChar format for dotext */
+        buffer = malloc(len * sizeof(IChar));
+        if (buffer != NULL) {
+            for (i = 0; i < len; i++) {
+                buffer[i] = (IChar)(unsigned char)text[i];
+            }
+            
+            /* Write message as terminal output (not shell input) */
+            dotext(xw, screen->gsets[(int)(screen->curgl)], buffer, (Cardinal)len);
+            
+            free(buffer);
+        }
+        
+        /* Move to next line for new shell prompt */
+        CarriageReturn(xw);
+        xtermIndex(xw, 1);
     }
 
     return 0;
