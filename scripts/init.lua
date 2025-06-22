@@ -5,11 +5,10 @@ print("XTerm Lua scripting initialized!")
 
 -- Example 1: Custom key bindings
 xterm.hooks.register("key_press", function(keysym, state)
-    -- Ctrl+T: Insert current timestamp
+    -- Ctrl+T: Enter Lua command mode
     if keysym == 116 and (state & 4) ~= 0 then  -- 't' key with Ctrl
-        local timestamp = os.time()
-        local timestr = os.date("%Y-%m-%d %H:%M:%S", timestamp)
-        xterm.terminal.write(timestr)
+        xterm.utils.log("Entering Lua command mode")
+        xterm.utils.enter_command_mode()
         return true  -- Event handled, don't pass through
     end
     
@@ -52,7 +51,26 @@ local original_title = xterm.config.get("title") or "xterm"
 xterm.utils.log("Lua scripting version loaded")
 xterm.utils.log("Original title: " .. original_title)
 
+-- Register command mode display hooks
+xterm.hooks.register("command_mode", function(action, data)
+    if action == "enter" then
+        -- Show prompt on new line
+        xterm.terminal.write("\n\027[7mLua> \027[0m")
+    elseif action == "exit" then
+        -- Clear the line if empty command
+        if (data or "") == "" then
+            xterm.terminal.write("\r\027[K")  -- Carriage return and clear line
+        else
+            xterm.terminal.write("\n")  -- New line after command
+        end
+    elseif action == "display" then
+        -- Update display with current command buffer
+        xterm.terminal.write("\r\027[K")  -- Carriage return and clear line
+        xterm.terminal.write("\027[7mLua> \027[0m" .. (data or ""))
+    end
+end)
+
 -- Print a welcome message
 xterm.terminal.write("\n--- XTerm Lua Scripting Active ---\n")
-xterm.terminal.write("Press Ctrl+T for timestamp, F12 for hello message\n")
-xterm.terminal.write("Type 'insert_date()' in the shell to see Lua integration\n\n")
+xterm.terminal.write("Press Ctrl+T to enter Lua command mode, F12 for hello message\n")
+xterm.terminal.write("In command mode: type Lua code, press Enter to execute, Escape to cancel\n\n")
