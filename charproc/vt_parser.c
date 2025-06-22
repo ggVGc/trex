@@ -1,4 +1,5 @@
 #include "vt_parser.h"
+#include "blinking.h"
 
 typedef enum {
     sa_INIT
@@ -55,6 +56,8 @@ init_groundtable(TScreen *screen, struct ParseState *sp)
 	sp->groundtable = ansi_table;
     }
 }
+
+#define ResetState(sp) InitParams(), (sp)->parsestate = (sp)->groundtable
 
 static void
 illegal_parse(XtermWidget xw, unsigned c, struct ParseState *sp)
@@ -3702,7 +3705,7 @@ VTReset(XtermWidget xw, Bool full, Bool saved)
     longjmp(vtjmpbuf, 1);	/* force ground state in parser */
 }
 
-static void
+void
 VTDestroy(Widget w GCC_UNUSED)
 {
 #ifdef NO_LEAKS
