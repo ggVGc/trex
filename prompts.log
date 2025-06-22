@@ -1,0 +1,11 @@
+PROMPT 1:
+The lua API currently supplies a function xterm.terminal.write. Implement a similar function called xterm.terminal.message, which writes a new line into the terminal, instead of sending the text to the current shell.
+
+PROMPT 2:
+The xterm.terminal.message function types the message into the current shell, which is wrong. Instead, it should write a new line directly to the terminal output, and then start a new shell input line below.
+
+PROMPT 3:
+After xterm.terminal.message finishes, the shell prompt should be displayed again.
+
+PROMPT 4:
+Add all past prompts to a file prompts.log
