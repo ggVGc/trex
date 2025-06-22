@@ -9,3 +9,12 @@ After xterm.terminal.message finishes, the shell prompt should be displayed agai
 
 PROMPT 4:
 Add all past prompts to a file prompts.log
+
+PROMPT 5:
+The shell prompt still does not display after using xterm.terminal.message.
+
+PROMPT 6:
+The API function xterm.terminal.message currently writes the message to a new line in the terminal. Instead it should show the message on lines from the bottom of the screen, and block input until the user presses the escape key. When the escape key is pressed, The message lines should be hidden, and normal operation resumed.
+
+PROMPT 7:
+Add an a function to the Lua API which returns the currently displayed text of in the terminal.

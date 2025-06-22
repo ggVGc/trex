@@ -123,6 +123,7 @@ int luaopen_xterm_hooks(lua_State *L);
 /* Terminal manipulation from Lua */
 int lua_terminal_write(lua_State *L);
 int lua_terminal_message(lua_State *L);
+int lua_terminal_get_text(lua_State *L);
 int lua_terminal_clear(lua_State *L);
 int lua_terminal_set_title(lua_State *L);
 int lua_terminal_bell(lua_State *L);
