@@ -40,12 +40,15 @@
 #include <errno.h>
 #include <stdarg.h>
 #include <time.h>
+#include <unistd.h>
 
 LuaContext *lua_ctx = NULL;
 
 static void lua_xterm_sandbox(lua_State *L);
 static int lua_xterm_panic(lua_State *L);
 static void lua_xterm_draw_command_line(void);
+static int lua_trex_require(lua_State *L);
+static void lua_xterm_setup_trex_paths(lua_State *L);
 
 int
 lua_xterm_init(void)
@@ -74,6 +77,9 @@ lua_xterm_init(void)
     /* Open standard libraries */
     luaL_openlibs(lua_ctx->L);
 
+    /* Set up trex runtime paths before sandbox */
+    lua_xterm_setup_trex_paths(lua_ctx->L);
+    
     /* Apply sandbox restrictions */
     lua_xterm_sandbox(lua_ctx->L);
 
@@ -304,10 +310,9 @@ lua_xterm_safe_call(lua_State *L, int nargs, int nresults)
 char *
 lua_xterm_get_script_path(const char *filename)
 {
-    char *home_dir;
-    char *script_path;
-    size_t path_len;
-
+    char *cwd_path;
+    char *home_path;
+    
     if (filename == NULL) {
         return NULL;
     }
@@ -315,6 +320,60 @@ lua_xterm_get_script_path(const char *filename)
     /* If filename is absolute, use it as-is */
     if (filename[0] == '/') {
         return x_strdup(filename);
+    }
+
+    /* First try current working directory */
+    cwd_path = lua_xterm_get_cwd_script_path(filename);
+    if (cwd_path != NULL && lua_xterm_file_exists(cwd_path)) {
+        return cwd_path;
+    }
+    if (cwd_path != NULL) {
+        free(cwd_path);
+    }
+
+    /* Fall back to home directory */
+    home_path = lua_xterm_get_home_script_path(filename);
+    return home_path;
+}
+
+char *
+lua_xterm_get_cwd_script_path(const char *filename)
+{
+    char *cwd;
+    char *script_path;
+    size_t path_len;
+
+    if (filename == NULL) {
+        return NULL;
+    }
+
+    cwd = lua_xterm_get_cwd();
+    if (cwd == NULL) {
+        return NULL;
+    }
+
+    path_len = strlen(cwd) + strlen(lua_ctx->script_dir) + strlen(filename) + 3;
+    script_path = (char *) malloc(path_len);
+    if (script_path == NULL) {
+        free(cwd);
+        return NULL;
+    }
+
+    snprintf(script_path, path_len, "%s/%s/%s", cwd, lua_ctx->script_dir, filename);
+    free(cwd);
+
+    return script_path;
+}
+
+char *
+lua_xterm_get_home_script_path(const char *filename)
+{
+    char *home_dir;
+    char *script_path;
+    size_t path_len;
+
+    if (filename == NULL) {
+        return NULL;
     }
 
     home_dir = lua_xterm_get_home_dir();
@@ -350,6 +409,19 @@ lua_xterm_get_home_dir(void)
         return x_strdup(home);
     }
     return x_strdup("/tmp");
+}
+
+char *
+lua_xterm_get_cwd(void)
+{
+    char *cwd;
+    char buffer[4096];
+    
+    cwd = getcwd(buffer, sizeof(buffer));
+    if (cwd != NULL) {
+        return x_strdup(cwd);
+    }
+    return NULL;
 }
 
 void
@@ -433,7 +505,8 @@ lua_xterm_sandbox(lua_State *L)
     lua_pushnil(L);
     lua_setglobal(L, "io");
     
-    lua_pushnil(L);
+    /* Replace require with our custom trex_require */
+    lua_pushcfunction(L, lua_trex_require);
     lua_setglobal(L, "require");
     
     lua_pushnil(L);
@@ -721,6 +794,123 @@ lua_xterm_command_mode_display(void)
     /* Call display hook if registered */
     lua_xterm_call_hook(LUA_HOOK_COMMAND_MODE, "ss", "display", 
                         lua_ctx->command_buffer ? lua_ctx->command_buffer : "");
+}
+
+/* Custom require function for trex runtime */
+static int
+lua_trex_require(lua_State *L)
+{
+    const char *module_name;
+    char *module_path = NULL;
+    char *cwd = NULL;
+    size_t path_len;
+    int result;
+
+    if (lua_gettop(L) != 1) {
+        return luaL_error(L, "Usage: require(module_name)");
+    }
+
+    module_name = luaL_checkstring(L, 1);
+    if (module_name == NULL) {
+        return luaL_error(L, "Module name cannot be nil");
+    }
+
+    /* Get current working directory */
+    cwd = lua_xterm_get_cwd();
+    if (cwd == NULL) {
+        return luaL_error(L, "Cannot get current working directory");
+    }
+
+    /* Construct module path: cwd/trex_runtime/module_name.lua */
+    path_len = strlen(cwd) + strlen("/trex_runtime/") + strlen(module_name) + strlen(".lua") + 1;
+    module_path = (char *) malloc(path_len);
+    if (module_path == NULL) {
+        free(cwd);
+        return luaL_error(L, "Out of memory");
+    }
+
+    snprintf(module_path, path_len, "%s/trex_runtime/%s.lua", cwd, module_name);
+    free(cwd);
+
+    /* Check if file exists */
+    if (!lua_xterm_file_exists(module_path)) {
+        free(module_path);
+        return luaL_error(L, "Module not found: %s", module_name);
+    }
+
+    /* Load and execute the module */
+    result = luaL_loadfile(L, module_path);
+    if (result != LUA_OK) {
+        free(module_path);
+        return lua_error(L);  /* Error message is already on stack */
+    }
+
+    free(module_path);
+
+    /* Execute the loaded chunk */
+    result = lua_xterm_safe_call(L, 0, 1);
+    if (result != LUA_OK) {
+        return lua_error(L);
+    }
+
+    return 1;  /* Return the result from the module */
+}
+
+/* Set up trex runtime paths and package configuration */
+static void
+lua_xterm_setup_trex_paths(lua_State *L)
+{
+    char *cwd = NULL;
+    char *trex_path = NULL;
+    size_t path_len;
+    
+    /* Get current working directory */
+    cwd = lua_xterm_get_cwd();
+    if (cwd == NULL) {
+        lua_xterm_debug("Failed to get current working directory for trex paths");
+        return;
+    }
+
+    /* Create trex_runtime path */
+    path_len = strlen(cwd) + strlen("/trex_runtime/?.lua") + 1;
+    trex_path = (char *) malloc(path_len);
+    if (trex_path == NULL) {
+        free(cwd);
+        lua_xterm_debug("Failed to allocate memory for trex path");
+        return;
+    }
+
+    snprintf(trex_path, path_len, "%s/trex_runtime/?.lua", cwd);
+    free(cwd);
+
+    /* Set up package.path to include trex_runtime directory */
+    lua_getglobal(L, "package");
+    if (lua_istable(L, -1)) {
+        lua_getfield(L, -1, "path");
+        if (lua_isstring(L, -1)) {
+            /* Prepend trex path to existing package.path */
+            const char *existing_path = lua_tostring(L, -1);
+            size_t full_path_len = strlen(trex_path) + strlen(";") + strlen(existing_path) + 1;
+            char *full_path = (char *) malloc(full_path_len);
+            if (full_path != NULL) {
+                snprintf(full_path, full_path_len, "%s;%s", trex_path, existing_path);
+                lua_pop(L, 1);  /* Pop old path */
+                lua_pushstring(L, full_path);
+                lua_setfield(L, -2, "path");
+                free(full_path);
+            }
+        } else {
+            /* No existing path, just set our path */
+            lua_pop(L, 1);  /* Pop nil/invalid value */
+            lua_pushstring(L, trex_path);
+            lua_setfield(L, -2, "path");
+        }
+    }
+    lua_pop(L, 1);  /* Pop package table */
+
+    free(trex_path);
+    
+    lua_xterm_debug("Set up trex runtime paths");
 }
 
 #endif /* OPT_LUA_SCRIPTING */

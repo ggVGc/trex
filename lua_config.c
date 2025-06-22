@@ -302,7 +302,7 @@ lua_config_set(lua_State *L)
         lua_xterm_debug("Foreground color change requested: %s", value);
     } else if (strcmp(key, "title") == 0) {
         /* Change window title */
-        ChangeTitle(xw, value);
+        ChangeTitle(xw, (char *) value);
     } else {
         lua_xterm_debug("Unknown config key: %s", key);
     }
