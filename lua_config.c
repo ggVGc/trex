@@ -98,6 +98,63 @@ lua_terminal_message(lua_State *L)
 }
 
 int
+lua_terminal_get_text(lua_State *L)
+{
+    XtermWidget xw = term;
+    TScreen *screen = TScreenOf(xw);
+    luaL_Buffer buffer;
+    int row, col;
+    CLineData *ld;
+    char line_buffer[256];
+    int line_len;
+    
+    /* Initialize Lua string buffer */
+    luaL_buffinit(L, &buffer);
+    
+    /* Iterate through all visible rows */
+    for (row = 0; row <= screen->max_row; row++) {
+        ld = getLineData(screen, row);
+        if (ld == NULL) continue;
+        
+        line_len = 0;
+        
+        /* Extract characters from this line */
+        for (col = 0; col < MaxCols(screen) && col < (int)(sizeof(line_buffer) - 1); col++) {
+            char ch = (char)ld->charData[col];
+            
+            /* Skip null characters and convert non-printable chars to spaces */
+            if (ch == 0) {
+                ch = ' ';
+            } else if (ch < 32 || ch > 126) {
+                ch = ' ';
+            }
+            
+            line_buffer[line_len++] = ch;
+        }
+        
+        /* Remove trailing spaces */
+        while (line_len > 0 && line_buffer[line_len - 1] == ' ') {
+            line_len--;
+        }
+        
+        /* Add line to buffer */
+        if (line_len > 0) {
+            line_buffer[line_len] = '\0';
+            luaL_addstring(&buffer, line_buffer);
+        }
+        
+        /* Add newline except for last row */
+        if (row < screen->max_row) {
+            luaL_addchar(&buffer, '\n');
+        }
+    }
+    
+    /* Return the assembled string */
+    luaL_pushresult(&buffer);
+    return 1;
+}
+
+int
 lua_terminal_clear(lua_State *L)
 {
     XtermWidget xw = term;
@@ -311,6 +368,7 @@ luaopen_xterm_terminal(lua_State *L)
     static const luaL_Reg terminal_funcs[] = {
         {"write", lua_terminal_write},
         {"message", lua_terminal_message},
+        {"get_text", lua_terminal_get_text},
         {"clear", lua_terminal_clear},
         {"set_title", lua_terminal_set_title},
         {"bell", lua_terminal_bell},
