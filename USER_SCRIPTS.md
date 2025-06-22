@@ -40,31 +40,34 @@ User scripts have access to the global `trex` object with these functions:
 -- ~/.config/trex/init.lua
 print("Loading user configuration...")
 
-if trex then
-    trex.utils.log("User configuration loaded!")
+-- Load trex API using normal require
+local trex = require("trex")
+
+trex.utils.log("User configuration loaded!")
+
+-- Load additional user modules from ~/.config/trex/
+local myutils = require("myutils")
+local keybinds = require("keybinds")
+
+-- Add custom functions
+local user_functions = {
+    hello = function()
+        trex.message("Hello from user script!")
+    end,
     
-    -- Load additional user modules
-    local myutils = require("myutils")
-    local keybinds = require("keybinds")
+    timestamp = function()
+        local date = os.date("%Y-%m-%d %H:%M:%S")
+        trex.write(date)
+    end,
     
-    -- Add custom functions
-    trex.user = {
-        hello = function()
-            trex.message("Hello from user script!")
-        end,
-        
-        timestamp = function()
-            local date = os.date("%Y-%m-%d %H:%M:%S")
-            trex.write(date)
-        end,
-        
-        -- Use functions from user modules
-        my_function = myutils.do_something,
-        setup_keys = keybinds.setup
-    }
-    
-    trex.utils.log("Custom functions available as trex.user.*")
-end
+    -- Use functions from user modules
+    my_function = myutils.do_something,
+    setup_keys = keybinds.setup
+}
+
+trex.utils.log("User configuration complete!")
+
+return user_functions
 ```
 
 ### User Module (`~/.config/trex/myutils.lua`)
@@ -93,7 +96,8 @@ return myutils
 ## Script Development Tips
 
 - Use `trex.utils.log()` for debugging output
-- Check `if trex then` to ensure API is available
+- Always use `local trex = require("trex")` to access the API
 - Use `trex.reload_scripts()` to test changes without restart
 - Place commonly used functions in `init.lua`
-- Use project-specific scripts for per-directory customization
+- Create additional modules in `~/.config/trex/` and require them
+- The system loads `runtime/trex_init.lua` on startup, which sets up user script loading

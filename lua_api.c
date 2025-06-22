@@ -238,13 +238,13 @@ lua_xterm_reload_scripts(void)
     luaopen_xterm_utils(lua_ctx->L);
     luaopen_xterm_hooks(lua_ctx->L);
 
-    /* Load trex module using standard require */
+    /* Load trex_init module using standard require */
     lua_getglobal(lua_ctx->L, "require");
     if (lua_isfunction(lua_ctx->L, -1)) {
-        lua_pushstring(lua_ctx->L, "trex");
+        lua_pushstring(lua_ctx->L, "trex_init");
         result = lua_xterm_safe_call(lua_ctx->L, 1, 0);
         if (result != LUA_OK) {
-            lua_xterm_error("Failed to load trex module: %s", lua_tostring(lua_ctx->L, -1));
+            lua_xterm_error("Failed to load trex_init module: %s", lua_tostring(lua_ctx->L, -1));
             lua_pop(lua_ctx->L, 1);
             return 0;
         }
