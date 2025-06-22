@@ -491,7 +491,8 @@ lua_xterm_exit_command_mode(void)
     extern XtermWidget term;
     XtermWidget xw = term;
     TScreen *screen;
-    int saved_row, saved_col;
+    LineData *ld;
+    int col;
     
     if (!lua_ctx) {
         return;
@@ -500,22 +501,17 @@ lua_xterm_exit_command_mode(void)
     /* Clear the command line before exiting */
     if (xw && lua_ctx->command_mode) {
         screen = TScreenOf(xw);
-        if (screen) {
-            /* Save position */
-            saved_row = screen->cur_row;
-            saved_col = screen->cur_col;
-            
-            /* Clear the bottom line */
-            screen->cur_row = screen->max_row;
-            screen->cur_col = 0;
-            ClearLine(xw);
-            
-            /* Restore position */
-            screen->cur_row = saved_row;
-            screen->cur_col = saved_col;
-            
-            /* Refresh */
-            ScrnRefresh(xw, screen->max_row, 0, 1, screen->max_col + 1, True);
+        if (screen && screen->max_row >= 0) {
+            ld = getLineData(screen, screen->max_row);
+            if (ld) {
+                /* Clear the last line */
+                for (col = 0; col <= screen->max_col; col++) {
+                    ld->charData[col] = (IChar)' ';
+                    ld->attribs[col] = 0;
+                }
+                /* Refresh the line */
+                ScrnRefresh(xw, screen->max_row, 0, 1, screen->max_col + 1, True);
+            }
         }
     }
     
@@ -638,66 +634,74 @@ lua_xterm_draw_command_line(void)
     extern XtermWidget term;
     XtermWidget xw = term;
     TScreen *screen;
-    static Boolean saved_wrap = False;
-    static int saved_row = 0, saved_col = 0;
     char prompt[] = "Lua> ";
-    int prompt_len = (int)strlen(prompt);
-    int i;
+    int prompt_len = 5; /* Length of "Lua> " */
+    int i, col;
+    LineData *ld;
     
     if (!xw || !lua_ctx || !lua_ctx->command_mode) {
         return;
     }
     
     screen = TScreenOf(xw);
-    if (!screen || !screen->visbuf) {
+    if (!screen || screen->max_row < 0) {
         return;
     }
     
-    /* Save current position on first call */
-    if (!saved_wrap) {
-        saved_row = screen->cur_row;
-        saved_col = screen->cur_col;
-        saved_wrap = True;
+    lua_xterm_debug("Drawing command line, max_row=%d, max_col=%d", 
+                    screen->max_row, screen->max_col);
+    
+    /* Get the last line of the screen buffer */
+    ld = getLineData(screen, screen->max_row);
+    if (!ld) {
+        lua_xterm_debug("Failed to get line data for row %d", screen->max_row);
+        return;
     }
     
-    /* Move to bottom line */
-    screen->cur_row = screen->max_row;
-    screen->cur_col = 0;
+    lua_xterm_debug("Got line data, clearing line");
     
-    /* Clear the line first */
-    ClearLine(xw);
+    /* Clear the line */
+    for (col = 0; col <= screen->max_col; col++) {
+        ld->charData[col] = (IChar)' ';
+        ld->attribs[col] = 0;
+    }
     
-    /* Write prompt with reverse video */
-    xw->flags |= INVERSE;
+    /* Write prompt in reverse video */
     for (i = 0; i < prompt_len; i++) {
-        InsertChar(xw, (unsigned)prompt[i]);
+        ld->charData[i] = (IChar)prompt[i];
+        ld->attribs[i] = INVERSE;
     }
-    xw->flags &= ~(unsigned)INVERSE;
+    
+    lua_xterm_debug("Wrote prompt, command_length=%zu", 
+                    lua_ctx->command_length);
     
     /* Write command buffer */
+    col = prompt_len;
     if (lua_ctx->command_buffer && lua_ctx->command_length > 0) {
-        int max_chars = screen->max_col - screen->cur_col;
         int chars_to_write = (int)lua_ctx->command_length;
-        if (chars_to_write > max_chars) {
-            chars_to_write = max_chars;
+        if (col + chars_to_write > screen->max_col) {
+            chars_to_write = screen->max_col - col;
         }
         
         for (i = 0; i < chars_to_write; i++) {
-            InsertChar(xw, (unsigned)lua_ctx->command_buffer[i]);
+            ld->charData[col + i] = (IChar)lua_ctx->command_buffer[i];
+            ld->attribs[col + i] = 0;
         }
+        col += chars_to_write;
+        
+        lua_xterm_debug("Wrote %d chars: '%.*s'", 
+                        chars_to_write, chars_to_write, lua_ctx->command_buffer);
     }
     
-    /* Show cursor position */
-    InsertChar(xw, (unsigned)'_');
-    
-    /* Restore position when done */
-    if (!lua_ctx->command_mode && saved_wrap) {
-        screen->cur_row = saved_row;
-        screen->cur_col = saved_col;
-        saved_wrap = False;
+    /* Add cursor indicator */
+    if (col <= screen->max_col) {
+        ld->charData[col] = (IChar)'_';
+        ld->attribs[col] = BLINK;
     }
     
-    /* Refresh the screen */
+    lua_xterm_debug("Refreshing screen");
+    
+    /* Mark line as dirty for refresh */
     ScrnRefresh(xw, screen->max_row, 0, 1, screen->max_col + 1, True);
 }
 
