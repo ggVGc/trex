@@ -33,6 +33,7 @@
 #include <data.h>
 #include <xstrings.h>
 #include <fontutils.h>
+#include <ptyx.h>
 
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -474,6 +475,9 @@ lua_xterm_enter_command_mode(void)
     lua_ctx->command_mode = True;
     lua_xterm_command_mode_clear();
     
+    /* Display the prompt immediately */
+    lua_xterm_command_mode_display();
+    
     /* Call command mode hook if registered */
     lua_xterm_call_hook(LUA_HOOK_COMMAND_MODE, "s", "enter");
     
@@ -483,8 +487,30 @@ lua_xterm_enter_command_mode(void)
 void
 lua_xterm_exit_command_mode(void)
 {
+    extern XtermWidget term;
+    XtermWidget xw = term;
+    TScreen *screen;
+    char prompt_buffer[64];
+    int len;
+    
     if (!lua_ctx) {
         return;
+    }
+    
+    /* Clear the prompt line before exiting */
+    if (xw && lua_ctx->command_mode) {
+        screen = TScreenOf(xw);
+        if (screen) {
+            /* Save cursor */
+            v_write(screen->respond, (const Char *) "\0337", 2);
+            
+            /* Move to bottom line and clear it */
+            len = snprintf(prompt_buffer, sizeof(prompt_buffer), "\033[%d;1H\033[K", screen->max_row + 1);
+            v_write(screen->respond, (const Char *) prompt_buffer, (unsigned) len);
+            
+            /* Restore cursor */
+            v_write(screen->respond, (const Char *) "\0338", 2);
+        }
     }
     
     lua_ctx->command_mode = False;
@@ -603,11 +629,45 @@ lua_xterm_get_command_buffer(void)
 void
 lua_xterm_command_mode_display(void)
 {
-    /* This function should update the terminal display with the current command */
-    /* The actual implementation will depend on xterm's display system */
-    if (!lua_ctx || !lua_ctx->command_mode) {
+    extern XtermWidget term;
+    XtermWidget xw = term;
+    TScreen *screen;
+    char prompt_buffer[1024];
+    int len;
+    
+    if (!lua_ctx || !lua_ctx->command_mode || !xw) {
         return;
     }
+    
+    screen = TScreenOf(xw);
+    if (!screen) {
+        return;
+    }
+    
+    /* Save cursor position */
+    v_write(screen->respond, (const Char *) "\0337", 2);
+    
+    /* Move to bottom line */
+    len = snprintf(prompt_buffer, sizeof(prompt_buffer), "\033[%d;1H", screen->max_row + 1);
+    v_write(screen->respond, (const Char *) prompt_buffer, (unsigned) len);
+    
+    /* Clear line */
+    v_write(screen->respond, (const Char *) "\033[K", 3);
+    
+    /* Display prompt in reverse video */
+    v_write(screen->respond, (const Char *) "\033[7mLua> ", 10);
+    
+    /* Display command buffer */
+    if (lua_ctx->command_buffer && lua_ctx->command_length > 0) {
+        v_write(screen->respond, (const Char *) lua_ctx->command_buffer, 
+                (unsigned) lua_ctx->command_length);
+    }
+    
+    /* Show cursor */
+    v_write(screen->respond, (const Char *) "_\033[0m", 5);
+    
+    /* Restore cursor position */
+    v_write(screen->respond, (const Char *) "\0338", 2);
     
     /* Call display hook if registered */
     lua_xterm_call_hook(LUA_HOOK_COMMAND_MODE, "ss", "display", 
