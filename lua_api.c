@@ -45,6 +45,7 @@ LuaContext *lua_ctx = NULL;
 
 static void lua_xterm_sandbox(lua_State *L);
 static int lua_xterm_panic(lua_State *L);
+static void lua_xterm_draw_command_line(void);
 
 int
 lua_xterm_init(void)
@@ -475,6 +476,9 @@ lua_xterm_enter_command_mode(void)
     lua_ctx->command_mode = True;
     lua_xterm_command_mode_clear();
     
+    /* Display the command line */
+    lua_xterm_draw_command_line();
+    
     /* Call command mode hook if registered */
     lua_xterm_call_hook(LUA_HOOK_COMMAND_MODE, "s", "enter");
     
@@ -484,8 +488,35 @@ lua_xterm_enter_command_mode(void)
 void
 lua_xterm_exit_command_mode(void)
 {
+    extern XtermWidget term;
+    XtermWidget xw = term;
+    TScreen *screen;
+    int saved_row, saved_col;
+    
     if (!lua_ctx) {
         return;
+    }
+    
+    /* Clear the command line before exiting */
+    if (xw && lua_ctx->command_mode) {
+        screen = TScreenOf(xw);
+        if (screen) {
+            /* Save position */
+            saved_row = screen->cur_row;
+            saved_col = screen->cur_col;
+            
+            /* Clear the bottom line */
+            screen->cur_row = screen->max_row;
+            screen->cur_col = 0;
+            ClearLine(xw);
+            
+            /* Restore position */
+            screen->cur_row = saved_row;
+            screen->cur_col = saved_col;
+            
+            /* Refresh */
+            ScrnRefresh(xw, screen->max_row, 0, 1, screen->max_col + 1, True);
+        }
     }
     
     lua_ctx->command_mode = False;
@@ -601,15 +632,84 @@ lua_xterm_get_command_buffer(void)
     return lua_ctx->command_buffer;
 }
 
+static void
+lua_xterm_draw_command_line(void)
+{
+    extern XtermWidget term;
+    XtermWidget xw = term;
+    TScreen *screen;
+    static Boolean saved_wrap = False;
+    static int saved_row = 0, saved_col = 0;
+    char prompt[] = "Lua> ";
+    int prompt_len = (int)strlen(prompt);
+    int i;
+    
+    if (!xw || !lua_ctx || !lua_ctx->command_mode) {
+        return;
+    }
+    
+    screen = TScreenOf(xw);
+    if (!screen || !screen->visbuf) {
+        return;
+    }
+    
+    /* Save current position on first call */
+    if (!saved_wrap) {
+        saved_row = screen->cur_row;
+        saved_col = screen->cur_col;
+        saved_wrap = True;
+    }
+    
+    /* Move to bottom line */
+    screen->cur_row = screen->max_row;
+    screen->cur_col = 0;
+    
+    /* Clear the line first */
+    ClearLine(xw);
+    
+    /* Write prompt with reverse video */
+    xw->flags |= INVERSE;
+    for (i = 0; i < prompt_len; i++) {
+        InsertChar(xw, (unsigned)prompt[i]);
+    }
+    xw->flags &= ~(unsigned)INVERSE;
+    
+    /* Write command buffer */
+    if (lua_ctx->command_buffer && lua_ctx->command_length > 0) {
+        int max_chars = screen->max_col - screen->cur_col;
+        int chars_to_write = (int)lua_ctx->command_length;
+        if (chars_to_write > max_chars) {
+            chars_to_write = max_chars;
+        }
+        
+        for (i = 0; i < chars_to_write; i++) {
+            InsertChar(xw, (unsigned)lua_ctx->command_buffer[i]);
+        }
+    }
+    
+    /* Show cursor position */
+    InsertChar(xw, (unsigned)'_');
+    
+    /* Restore position when done */
+    if (!lua_ctx->command_mode && saved_wrap) {
+        screen->cur_row = saved_row;
+        screen->cur_col = saved_col;
+        saved_wrap = False;
+    }
+    
+    /* Refresh the screen */
+    ScrnRefresh(xw, screen->max_row, 0, 1, screen->max_col + 1, True);
+}
+
 void
 lua_xterm_command_mode_display(void)
 {
-    /* For now, just call the hook to let Lua handle the display */
-    /* The visual display needs to be handled differently to avoid */
-    /* interfering with the terminal's normal operation */
     if (!lua_ctx || !lua_ctx->command_mode) {
         return;
     }
+    
+    /* Draw the command line */
+    lua_xterm_draw_command_line();
     
     /* Call display hook if registered */
     lua_xterm_call_hook(LUA_HOOK_COMMAND_MODE, "ss", "display", 

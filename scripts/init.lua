@@ -51,24 +51,8 @@ local original_title = xterm.config.get("title") or "xterm"
 xterm.utils.log("Lua scripting version loaded")
 xterm.utils.log("Original title: " .. original_title)
 
--- Register command mode display hooks
-xterm.hooks.register("command_mode", function(action, data)
-    if action == "enter" then
-        -- Show prompt on new line
-        xterm.terminal.write("\n\027[7mLua> \027[0m")
-    elseif action == "exit" then
-        -- Clear the line if empty command
-        if (data or "") == "" then
-            xterm.terminal.write("\r\027[K")  -- Carriage return and clear line
-        else
-            xterm.terminal.write("\n")  -- New line after command
-        end
-    elseif action == "display" then
-        -- Update display with current command buffer
-        xterm.terminal.write("\r\027[K")  -- Carriage return and clear line
-        xterm.terminal.write("\027[7mLua> \027[0m" .. (data or ""))
-    end
-end)
+-- Command mode display is now handled in C code
+-- The hooks are still available for additional customization if needed
 
 -- Print a welcome message
 xterm.terminal.write("\n--- XTerm Lua Scripting Active ---\n")
