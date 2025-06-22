@@ -47,7 +47,6 @@ LuaContext *lua_ctx = NULL;
 static void lua_xterm_sandbox(lua_State *L);
 static int lua_xterm_panic(lua_State *L);
 static void lua_xterm_draw_command_line(void);
-static int lua_trex_require(lua_State *L);
 static void lua_xterm_setup_trex_paths(lua_State *L);
 
 int
@@ -235,11 +234,23 @@ lua_xterm_reload_scripts(void)
     luaopen_xterm_utils(lua_ctx->L);
     luaopen_xterm_hooks(lua_ctx->L);
 
-    /* Load init script */
-    result = lua_xterm_load_script(lua_ctx->init_script);
-    lua_ctx->last_reload = time(NULL);
-
-    return result;
+    /* Load trex module using standard require */
+    lua_getglobal(lua_ctx->L, "require");
+    if (lua_isfunction(lua_ctx->L, -1)) {
+        lua_pushstring(lua_ctx->L, "trex");
+        result = lua_xterm_safe_call(lua_ctx->L, 1, 0);
+        if (result != LUA_OK) {
+            lua_xterm_error("Failed to load trex module: %s", lua_tostring(lua_ctx->L, -1));
+            lua_pop(lua_ctx->L, 1);
+            return 0;
+        }
+        lua_ctx->last_reload = time(NULL);
+        return 1;
+    } else {
+        lua_pop(lua_ctx->L, 1);
+        lua_xterm_error("require function not available");
+        return 0;
+    }
 }
 
 void
@@ -505,15 +516,7 @@ lua_xterm_sandbox(lua_State *L)
     lua_pushnil(L);
     lua_setglobal(L, "io");
     
-    /* Replace require with our custom trex_require */
-    lua_pushcfunction(L, lua_trex_require);
-    lua_setglobal(L, "require");
-    
-    lua_pushnil(L);
-    lua_setglobal(L, "dofile");
-    
-    lua_pushnil(L);
-    lua_setglobal(L, "loadfile");
+    /* Keep standard require, dofile, and loadfile functions */
     
     /* Create a safe os table with limited functions */
     lua_newtable(L);
@@ -796,65 +799,6 @@ lua_xterm_command_mode_display(void)
                         lua_ctx->command_buffer ? lua_ctx->command_buffer : "");
 }
 
-/* Custom require function for trex runtime */
-static int
-lua_trex_require(lua_State *L)
-{
-    const char *module_name;
-    char *module_path = NULL;
-    char *cwd = NULL;
-    size_t path_len;
-    int result;
-
-    if (lua_gettop(L) != 1) {
-        return luaL_error(L, "Usage: require(module_name)");
-    }
-
-    module_name = luaL_checkstring(L, 1);
-    if (module_name == NULL) {
-        return luaL_error(L, "Module name cannot be nil");
-    }
-
-    /* Get current working directory */
-    cwd = lua_xterm_get_cwd();
-    if (cwd == NULL) {
-        return luaL_error(L, "Cannot get current working directory");
-    }
-
-    /* Construct module path: cwd/runtime/module_name.lua */
-    path_len = strlen(cwd) + strlen("/runtime/") + strlen(module_name) + strlen(".lua") + 1;
-    module_path = (char *) malloc(path_len);
-    if (module_path == NULL) {
-        free(cwd);
-        return luaL_error(L, "Out of memory");
-    }
-
-    snprintf(module_path, path_len, "%s/runtime/%s.lua", cwd, module_name);
-    free(cwd);
-
-    /* Check if file exists */
-    if (!lua_xterm_file_exists(module_path)) {
-        free(module_path);
-        return luaL_error(L, "Module not found: %s", module_name);
-    }
-
-    /* Load and execute the module */
-    result = luaL_loadfile(L, module_path);
-    if (result != LUA_OK) {
-        free(module_path);
-        return lua_error(L);  /* Error message is already on stack */
-    }
-
-    free(module_path);
-
-    /* Execute the loaded chunk */
-    result = lua_xterm_safe_call(L, 0, 1);
-    if (result != LUA_OK) {
-        return lua_error(L);
-    }
-
-    return 1;  /* Return the result from the module */
-}
 
 /* Set up trex runtime paths and package configuration */
 static void
@@ -871,8 +815,22 @@ lua_xterm_setup_trex_paths(lua_State *L)
         return;
     }
 
-    /* Create runtime path */
-    path_len = strlen(cwd) + strlen("/runtime/?.lua") + 1;
+    /* Create runtime paths - support subdirectories and standard Lua patterns */
+    const char *patterns[] = {
+        "/runtime/?.lua",
+        "/runtime/?/init.lua", 
+        "/runtime/lib/?.lua",
+        "/runtime/lib/?/init.lua"
+    };
+    size_t num_patterns = sizeof(patterns) / sizeof(patterns[0]);
+    
+    /* Calculate total length needed */
+    path_len = 1; /* for null terminator */
+    for (size_t i = 0; i < num_patterns; i++) {
+        path_len += strlen(cwd) + strlen(patterns[i]);
+        if (i > 0) path_len += 1; /* for semicolon */
+    }
+    
     trex_path = (char *) malloc(path_len);
     if (trex_path == NULL) {
         free(cwd);
@@ -880,7 +838,13 @@ lua_xterm_setup_trex_paths(lua_State *L)
         return;
     }
 
-    snprintf(trex_path, path_len, "%s/runtime/?.lua", cwd);
+    /* Build the complete path string */
+    trex_path[0] = '\0';
+    for (size_t i = 0; i < num_patterns; i++) {
+        if (i > 0) strcat(trex_path, ";");
+        strcat(trex_path, cwd);
+        strcat(trex_path, patterns[i]);
+    }
     free(cwd);
 
     /* Set up package.path to include runtime directory */
