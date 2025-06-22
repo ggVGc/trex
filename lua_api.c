@@ -821,7 +821,7 @@ lua_xterm_setup_trex_paths(lua_State *L)
 
     /* Create paths including current working directory and runtime subdirectories */
     const char *patterns[] = {
-        "/runtime/?.lua"           /* Runtime directory */
+        "/runtime/?.lua"
     };
     size_t num_patterns = sizeof(patterns) / sizeof(patterns[0]);
     

@@ -2,6 +2,7 @@ print("=== Runtime/trex.lua loaded successfully! ===")
 
 -- Test that we can require other runtime modules
 local utils = require("trex.utils")
+local advanced = require("trex.advanced")
 utils.log("Runtime system initialized and ready!")
 
 -- Test package.path configuration

@@ -2,7 +2,7 @@
 local advanced = {}
 
 -- Import utils from the same directory (relative import test)
-local utils = require("trex/utils")
+local utils = require("trex.utils")
 
 function advanced.complex_operation(data)
     utils.log("Performing complex operation on: " .. tostring(data))
