@@ -513,22 +513,8 @@ lua_xterm_check_reload(void)
 static void
 lua_xterm_sandbox(lua_State *L)
 {
-    /* Remove dangerous functions */
-    lua_pushnil(L);
-    lua_setglobal(L, "os");
-    
-    lua_pushnil(L);
-    lua_setglobal(L, "io");
-    
-    /* Keep standard require, dofile, and loadfile functions */
-    
-    /* Create a safe os table with limited functions */
-    lua_newtable(L);
-    
-    lua_pushcfunction(L, lua_utils_timestamp);
-    lua_setfield(L, -2, "time");
-    
-    lua_setglobal(L, "os");
+    /* No sandbox restrictions - full Lua environment available */
+    /* os, io, dofile, loadfile, and all standard libraries are accessible */
 }
 
 static int
