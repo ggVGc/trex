@@ -224,6 +224,10 @@ lua_xterm_reload_scripts(void)
 
     lua_atpanic(lua_ctx->L, lua_xterm_panic);
     luaL_openlibs(lua_ctx->L);
+    
+    /* Set up trex runtime paths before sandbox */
+    lua_xterm_setup_trex_paths(lua_ctx->L);
+    
     lua_xterm_sandbox(lua_ctx->L);
 
     /* Re-register libraries */
@@ -815,12 +819,9 @@ lua_xterm_setup_trex_paths(lua_State *L)
         return;
     }
 
-    /* Create runtime paths - support subdirectories and standard Lua patterns */
+    /* Create paths including current working directory and runtime subdirectories */
     const char *patterns[] = {
-        "/runtime/?.lua",
-        "/runtime/?/init.lua", 
-        "/runtime/lib/?.lua",
-        "/runtime/lib/?/init.lua"
+        "/runtime/?.lua"           /* Runtime directory */
     };
     size_t num_patterns = sizeof(patterns) / sizeof(patterns[0]);
     

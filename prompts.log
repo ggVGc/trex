@@ -36,3 +36,6 @@ Remove custom require implementation entirely. Use package.path to load trex.lua
 
 PROMPT 13:
 Remove restrictions of dofile and loadfile
+
+PROMPT 14:
+Add the current working directory to package.path by dafault.
