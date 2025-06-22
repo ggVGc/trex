@@ -57,6 +57,47 @@ lua_terminal_write(lua_State *L)
 }
 
 int
+lua_terminal_message(lua_State *L)
+{
+    const char *text;
+    size_t len;
+    XtermWidget xw = term;
+    TScreen *screen = TScreenOf(xw);
+    IChar *buffer;
+    size_t i;
+
+    if (lua_gettop(L) != 1) {
+        return luaL_error(L, "Usage: xterm.terminal.message(text)");
+    }
+
+    text = luaL_checklstring(L, 1, &len);
+    if (text != NULL && len > 0) {
+        /* Move to beginning of line and then to next line */
+        CarriageReturn(xw);
+        xtermIndex(xw, 1);
+        
+        /* Convert text to IChar format for dotext */
+        buffer = malloc(len * sizeof(IChar));
+        if (buffer != NULL) {
+            for (i = 0; i < len; i++) {
+                buffer[i] = (IChar)(unsigned char)text[i];
+            }
+            
+            /* Write message as terminal output (not shell input) */
+            dotext(xw, screen->gsets[(int)(screen->curgl)], buffer, (Cardinal)len);
+            
+            free(buffer);
+        }
+        
+        /* Move to next line for new shell prompt */
+        CarriageReturn(xw);
+        xtermIndex(xw, 1);
+    }
+
+    return 0;
+}
+
+int
 lua_terminal_clear(lua_State *L)
 {
     XtermWidget xw = term;
@@ -269,6 +310,7 @@ luaopen_xterm_terminal(lua_State *L)
 {
     static const luaL_Reg terminal_funcs[] = {
         {"write", lua_terminal_write},
+        {"message", lua_terminal_message},
         {"clear", lua_terminal_clear},
         {"set_title", lua_terminal_set_title},
         {"bell", lua_terminal_bell},
