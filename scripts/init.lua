@@ -3,11 +3,16 @@
 
 print("XTerm Lua scripting initialized!")
 
+function log(arg)
+  xterm.utils.log(arg)
+  print(arg)
+end
+
 -- Example 1: Custom key bindings
 xterm.hooks.register("key_press", function(keysym, state)
     -- Ctrl+T: Enter Lua command mode
     if keysym == 116 and (state & 4) ~= 0 then  -- 't' key with Ctrl
-        xterm.utils.log("Entering Lua command mode")
+        log("Entering Lua command mode")
         xterm.utils.enter_command_mode()
         return true  -- Event handled, don't pass through
     end
@@ -28,13 +33,13 @@ xterm.hooks.register("char_post", function(char, attrs)
     char_count = char_count + 1
     -- Every 100 characters, log a message
     if char_count % 100 == 0 then
-        xterm.utils.log("Processed " .. char_count .. " characters")
+        log("Processed " .. char_count .. " characters")
     end
 end)
 
 -- Example 3: Terminal events
 xterm.events.on("startup", function()
-    xterm.utils.log("Terminal started with Lua scripting enabled")
+    log("Terminal started with Lua scripting enabled")
     xterm.terminal.set_title("XTerm with Lua")
 end)
 
@@ -48,8 +53,8 @@ end
 local original_title = xterm.config.get("title") or "xterm"
 
 -- Log some information about the environment
-xterm.utils.log("Lua scripting version loaded")
-xterm.utils.log("Original title: " .. original_title)
+log("Lua scripting version loaded")
+log("Original title: " .. original_title)
 
 -- Command mode display is now handled in C code
 -- The hooks are still available for additional customization if needed
