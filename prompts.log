@@ -50,3 +50,8 @@ PROMPT 17:
 Currently, the lua extensibility is added directly in several files in the project. We should break out the extension API, and move the lua functionality into a new directory called plugins/lua, where we use the extension API.
 
 Summary: Successfully refactored Lua extensibility into a modular plugin system. Created extension API framework with plugins/lua directory containing Lua-specific implementation. Fixed linking errors by correcting include paths and object file locations. Updated Makefile.in with explicit compilation rules for plugin subdirectories and proper clean rules. Build system now works automatically without manual file movement - clean builds work perfectly.
+
+PROMPT 18:
+The keypress hook in init.lua doesn't work.
+
+Summary: Fixed keypress hook registration by connecting the Lua hook registration API to the actual plugin hook system. The issue was that `lua_hooks_register_plugin` was creating Lua function references but not storing them in the plugin's hook lists. Added plugin context tracking to lua_api_libs.c and implemented proper hook registration that calls `lua_plugin_register_hook()` to store hooks in the plugin data structure. Also fixed variable argument handling in `extension_system_call_hook`. Keypress hooks in init.lua now work correctly as confirmed by debug output showing successful hook registration and the proper extension API initialization.

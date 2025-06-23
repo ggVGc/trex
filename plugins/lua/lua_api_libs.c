@@ -26,10 +26,12 @@
  */
 
 #include "lua_plugin.h"
+#include <extension_api.h>
 
 #ifdef OPT_LUA_SCRIPTING
 
 static const ExtensionAPI *current_api = NULL;
+static ExtensionPlugin *current_plugin = NULL;
 
 /* Terminal API functions */
 static int
@@ -292,6 +294,7 @@ lua_hooks_register_plugin(lua_State *L)
     const char *hook_name;
     ExtensionHookType hook_type;
     int ref;
+    LuaPluginData *data;
 
     if (lua_gettop(L) != 2) {
         return luaL_error(L, "Usage: xterm.hooks.register(hook_name, function)");
@@ -309,11 +312,20 @@ lua_hooks_register_plugin(lua_State *L)
     lua_pushvalue(L, 2);
     ref = luaL_ref(L, LUA_REGISTRYINDEX);
 
-    /* Find the current plugin and register hook */
-    /* This is a simplified implementation - in practice we'd need to
-     * find the current plugin context somehow */
-    if (current_api) {
-        current_api->debug_message("Lua hook registered: %s", hook_name);
+    /* Register hook with the Lua plugin */
+    if (current_plugin && current_plugin->plugin_data) {
+        data = (LuaPluginData *) current_plugin->plugin_data;
+        if (lua_plugin_register_hook(data, hook_type, ref)) {
+            if (current_api) {
+                current_api->debug_message("Lua hook registered: %s", hook_name);
+            }
+        } else {
+            luaL_unref(L, LUA_REGISTRYINDEX, ref);
+            return luaL_error(L, "Failed to register hook: %s", hook_name);
+        }
+    } else {
+        luaL_unref(L, LUA_REGISTRYINDEX, ref);
+        return luaL_error(L, "No plugin context available for hook registration");
     }
 
     return 0;
@@ -496,6 +508,11 @@ luaopen_xterm_hooks_plugin(lua_State *L, const ExtensionAPI *api)
     };
 
     current_api = api;
+
+    /* Find the Lua plugin in the extension registry */
+    if (api && ext_registry && ext_registry->initialized) {
+        current_plugin = extension_registry_find_plugin("lua");
+    }
 
     /* Create xterm table if it doesn't exist */
     lua_getglobal(L, "xterm");

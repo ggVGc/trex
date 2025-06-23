@@ -38,10 +38,12 @@ xterm.hooks.register("char_post", function(char, attrs)
 end)
 
 -- Example 3: Terminal events
+--[[
 xterm.events.on("startup", function()
     log("Terminal started with Lua scripting enabled")
     xterm.terminal.set_title("XTerm with Lua")
 end)
+--]]
 
 -- Example 4: Simple utility function
 function insert_date()

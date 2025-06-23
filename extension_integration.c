@@ -78,14 +78,35 @@ Boolean
 extension_system_call_hook(ExtensionHookType type, ...)
 {
     va_list args;
-    Boolean result;
+    Boolean result = False;
 
     if (!system_enabled) {
         return False;
     }
 
     va_start(args, type);
-    result = extension_call_hook(type, args);
+    
+    /* Call extension_call_hook with variable arguments */
+    switch (type) {
+    case EXT_HOOK_KEY_PRESS:
+    case EXT_HOOK_KEY_RELEASE:
+        {
+            int keysym = va_arg(args, int);
+            int state = va_arg(args, int);
+            result = extension_call_hook(type, keysym, state);
+            break;
+        }
+    case EXT_HOOK_COMMAND_MODE:
+        {
+            const char *mode = va_arg(args, const char *);
+            result = extension_call_hook(type, mode);
+            break;
+        }
+    default:
+        result = extension_call_hook(type);
+        break;
+    }
+    
     va_end(args);
 
     return result;
