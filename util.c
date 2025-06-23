@@ -63,7 +63,7 @@
 #include <xstrings.h>
 
 #ifdef OPT_LUA_SCRIPTING
-#include <lua_api.h>
+#include <extension_integration.h>
 #endif
 
 #include <stdio.h>

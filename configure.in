@@ -1264,8 +1264,8 @@ if test "$enable_lua_scripting" = yes ; then
 		if test "x$lua_inc" != "x" ; then
 			AC_DEFINE_UNQUOTED(LUA_INCLUDE_PREFIX,"$lua_inc",[Lua include prefix])
 		fi
-		LUA_SRCS="lua_api.c lua_hooks.c lua_config.c lua_utils.c"
-		LUA_OBJS="lua_api.o lua_hooks.o lua_config.o lua_utils.o"
+		LUA_SRCS="extension_api.c extension_integration.c plugins/lua/lua_plugin.c plugins/lua/lua_api_libs.c"
+		LUA_OBJS="extension_api.o extension_integration.o plugins/lua/lua_plugin.o plugins/lua/lua_api_libs.o"
 	else
 		AC_MSG_ERROR([Lua library not found - install Lua development packages])
 	fi

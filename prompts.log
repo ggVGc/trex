@@ -45,3 +45,6 @@ Rename the binary from xterm to trex
 
 PROMPT 16:
 Add $HOME/.local/share/xterm as an alternative directory for runtime files.
+
+PROMPT 17:
+Currently, the lua extensibility is added directly in several files in the project. We should break out the extension API, and move the lua functionality into a new directory called plugins/lua, where we use the extension API.

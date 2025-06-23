@@ -73,7 +73,7 @@
 #include <graphics.h>
 
 #ifdef OPT_LUA_SCRIPTING
-#include <lua_api.h>
+#include <extension_integration.h>
 #endif
 
 /* xterm uses these X Toolkit resource names, which are exported in array */
@@ -2973,11 +2973,11 @@ main(int argc, char *argv[]ENVP_ARG)
     spawnXTerm(term, line_speed);
 
 #ifdef OPT_LUA_SCRIPTING
-    /* Initialize Lua scripting after terminal is set up */
-    if (!lua_xterm_init()) {
-        fprintf(stderr, "Warning: Failed to initialize Lua scripting\n");
+    /* Initialize extension system after terminal is set up */
+    if (!extension_system_init()) {
+        fprintf(stderr, "Warning: Failed to initialize extension system\n");
     } else {
-        lua_xterm_call_hook(LUA_HOOK_STARTUP);
+        extension_system_call_hook(EXT_HOOK_STARTUP);
     }
 #endif
 
@@ -5580,9 +5580,9 @@ Exit(int n)
     TScreen *screen = TScreenOf(xw);
 
 #ifdef OPT_LUA_SCRIPTING
-    /* Clean up Lua scripting */
-    lua_xterm_call_hook(LUA_HOOK_SHUTDOWN);
-    lua_xterm_cleanup();
+    /* Clean up extension system */
+    extension_system_call_hook(EXT_HOOK_SHUTDOWN);
+    extension_system_cleanup();
 #endif
 
 #ifdef USE_UTEMPTER

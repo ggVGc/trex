@@ -57,7 +57,7 @@
 #include <xterm.h>
 
 #ifdef OPT_LUA_SCRIPTING
-#include <lua_api.h>
+#include <extension_integration.h>
 #endif
 
 #include <X11/keysym.h>
