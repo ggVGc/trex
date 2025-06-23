@@ -42,6 +42,116 @@ struct ParseState {
 
 static struct ParseState myState;
 
+/* Global variables and macros moved from charproc.c */
+#define	DEFAULT		-1
+static ANSI reply;
+static PARAMS parms;
+#define nparam parms.count
+static jmp_buf vtjmpbuf;
+#define TRACE_GSETS(name) TRACE(("CASE_GSETS%s(%d) = '%c'\n", name, sp->scstype, AsciiOf(c)))
+
+/* BitFunc typedef moved from charproc.c */
+typedef int (*BitFunc) (unsigned * /* p */ ,
+			unsigned /* mask */ );
+
+/* Function-like macros moved from charproc.c */
+#define InitParams()  init_params()
+#define SafeAlloc(type, area, used, size) \
+		type *new_string = area; \
+		size_t new_length = size; \
+		if (new_length == 0) { \
+		    new_length = 1024; \
+		    new_string = TypeMallocN(type, new_length); \
+		} else if (used+1 >= new_length) { \
+		    new_length = size * 2; \
+		    new_string = TypeMallocN(type, new_length); \
+		} \
+		if (new_string != NULL) { \
+		    if (area != NULL && used != 0) { \
+			memcpy(new_string, area, used * sizeof(type)); \
+		    } else { \
+			memset(new_string, 0, 3 * sizeof(type)); \
+		    } \
+		}
+#define SetParam(n,v) parms.params[(n)] = v
+#define GetParam(n)   parms.params[(n)]
+#define WriteNow() {							\
+	    unsigned single = 0;					\
+									\
+	    if (screen->curss) {					\
+		if (sp->print_area != NULL) {				\
+		    dotext(xw,						\
+			   screen->gsets[(int) (screen->curss)],	\
+			   sp->print_area,				\
+			   (Cardinal) 1);				\
+		    single++;						\
+		}							\
+		screen->curss = 0;					\
+	    }								\
+	    if (sp->print_used > single) {				\
+		if (sp->print_area != NULL) {				\
+		    dotext(xw,						\
+			   screen->gsets[(int) (screen->curgl)],	\
+			   sp->print_area + single,			\
+			   (Cardinal) (sp->print_used - single));	\
+		}							\
+	    }								\
+	    sp->print_used = 0;						\
+	}								\
+
+#if OPT_TRACE > 0
+#define DumpParams() dump_params()
+#else
+#define DumpParams()		/* nothing */
+#endif
+
+#define one_if_default(which) use_default_value(which, 1)
+#define zero_if_default(which) use_default_value(which, 0)
+#define ParamPair(n)  nparam - (n), parms.params + (n)
+#define SafeFree(area, size) \
+		if (area != new_string) { \
+		    free(area); \
+		    area = new_string; \
+		} \
+		size = new_length
+
+/* Function declarations moved from charproc.c */
+static void init_reply(unsigned type);
+static void ansi_modes(XtermWidget xw, BitFunc func);
+static int param_has_subparams(int item);
+static void resetRendition(XtermWidget xw);
+static void reset_SGR_Colors(XtermWidget xw);
+static void setExtendedFG(XtermWidget xw);
+#if OPT_WIDE_ATTRS
+static void setItalicFont(XtermWidget xw, Bool enable);
+#else
+#define setItalicFont(xw, enable) /* nothing */
+#endif
+static void setExtendedBG(XtermWidget xw);
+#if OPT_WIDE_ATTRS
+static void ResetItalics(XtermWidget xw);
+#else
+#define ResetItalics(xw)	/* nothing */
+#endif
+static Boolean parse_extended_colors(XtermWidget xw, int *colorp, int *itemp, Boolean *extended);
+static void reset_SGR_Foreground(XtermWidget xw);
+static void reset_SGR_Background(XtermWidget xw);
+static void set_tb_margins(TScreen *screen, int top, int bottom);
+static void dpmodes(XtermWidget xw, BitFunc func);
+static void set_lr_margins(TScreen *screen, int left, int right);
+static int only_default(void);
+static int use_default_value(int which, int default_value);
+#if OPT_DEC_RECTOPS
+static DECNRCM_codes current_charset(TScreen *screen, int value);
+#endif
+static void RequestResize(XtermWidget xw, int rows, int cols, Bool text);
+static int bitset(unsigned *p, unsigned mask);
+static int bitclr(unsigned *p, unsigned mask);
+static IChar doinput(XtermWidget xw);
+#if OPT_TRACE > 0
+static void dump_params(void);
+#endif
+
 static void
 init_groundtable(TScreen *screen, struct ParseState *sp)
 {
@@ -3986,4 +4096,521 @@ VTDestroy(Widget w GCC_UNUSED)
     memset(&myState, 0, sizeof(myState));
 
 #endif /* defined(NO_LEAKS) */
+}
+
+/* Function implementations moved from charproc.c */
+
+static int
+init_params(void)
+{
+    while (parms.count-- > 0) {
+	parms.is_sub[parms.count] = 0;
+	parms.params[parms.count] = 0;
+    }
+    parms.count = 0;
+    parms.has_subparams = 0;
+    return 0;
+}
+
+#if OPT_TRACE > 0
+static void
+dump_params(void)
+{
+    int n;
+    int arg;
+    TRACE(("params %d (%d)\n", nparam, parms.has_subparams));
+    for (arg = 1, n = 0; n < nparam; ++n) {
+	TRACE(("%3d.%d %d\n", arg, parms.is_sub[n], parms.params[n]));
+	if (!parms.is_sub[n])
+	    ++arg;
+    }
+}
+#endif
+
+static void
+init_reply(unsigned type)
+{
+    memset(&reply, 0, sizeof(reply));
+    reply.a_type = (Char) type;
+}
+
+static void
+ansi_modes(XtermWidget xw, BitFunc func)
+{
+    int i;
+
+    for (i = 0; i < nparam; ++i) {
+	switch (GetParam(i)) {
+	case 2:		/* KAM (if set, keyboard locked */
+	    (*func) (&xw->keyboard.flags, MODE_KAM);
+	    break;
+
+	case 4:		/* IRM                          */
+	    (*func) (&xw->flags, INSERT);
+	    break;
+
+	case 12:		/* SRM (if set, local echo      */
+	    (*func) (&xw->keyboard.flags, MODE_SRM);
+	    break;
+
+	case 20:		/* LNM                          */
+	    (*func) (&xw->flags, LINEFEED);
+	    update_autolinefeed();
+	    break;
+	}
+    }
+}
+
+static int
+param_has_subparams(int item)
+{
+    int result = 0;
+    if (parms.has_subparams) {
+	int p = param_number(item);
+	int n = subparam_index(p, 0);
+	if (n >= 0 && parms.is_sub[n]) {
+	    while (++n < nparam && parms.is_sub[n - 1] < parms.is_sub[n]) {
+		result++;
+	    }
+	}
+    }
+    TRACE(("...param_has_subparams(%d) ->%d\n", item, result));
+    return result;
+}
+
+static void
+resetRendition(XtermWidget xw)
+{
+    TScreen *screen = TScreenOf(xw);
+    (void) screen;
+    ResetItalics(xw);
+    UIntClr(xw->flags,
+	    (SGR_MASK | SGR_MASK2 | INVISIBLE));
+}
+
+static void
+reset_SGR_Colors(XtermWidget xw)
+{
+    reset_SGR_Foreground(xw);
+    reset_SGR_Background(xw);
+}
+
+static void
+setExtendedFG(XtermWidget xw)
+{
+    int fg = xw->sgr_foreground;
+
+    if (TScreenOf(xw)->colorAttrMode
+	|| (fg < 0)) {
+	fg = MapToColorMode(fg, TScreenOf(xw), xw->flags);
+    }
+
+#if OPT_PC_COLORS
+    if (TScreenOf(xw)->boldColors
+	&& (!xw->sgr_38_xcolors)
+	&& (fg >= 0)
+	&& (fg < 8)
+	&& (xw->flags & BOLD))
+	fg |= 8;
+#endif
+
+    SGR_Foreground(xw, fg);
+}
+
+#if OPT_WIDE_ATTRS
+static void
+setItalicFont(XtermWidget xw, Bool enable)
+{
+    if (enable) {
+	if ((xw->flags & ATR_ITALIC) == 0) {
+	    xtermLoadItalics(xw);
+	    TRACE(("setItalicFont: enabling Italics\n"));
+	    xtermUpdateFontGCs(xw, getItalicFont);
+	}
+    } else if ((xw->flags & ATR_ITALIC) != 0) {
+	TRACE(("setItalicFont: disabling Italics\n"));
+	xtermUpdateFontGCs(xw, getNormalFont);
+    }
+}
+#endif
+
+static void
+setExtendedBG(XtermWidget xw)
+{
+    int bg = xw->sgr_background;
+
+    if (TScreenOf(xw)->colorAttrMode
+	|| (bg < 0)) {
+	if (TScreenOf(xw)->colorRVMode && (xw->flags & INVERSE))
+	    bg = COLOR_RV;
+    }
+
+    SGR_Background(xw, bg);
+}
+
+#if OPT_WIDE_ATTRS
+static void
+ResetItalics(XtermWidget xw)
+{
+    setItalicFont(xw, False);
+    UIntClr(xw->flags, ATR_ITALIC);
+}
+#endif
+
+static Boolean
+parse_extended_colors(XtermWidget xw, int *colorp, int *itemp, Boolean *extended)
+{
+    Boolean result = False;
+    int item = *itemp;
+    int next = item;
+    int base = param_number(item);
+    int code = -1;
+    int values[3];		/* maximum number of subparameters */
+    int need = 0;		/* number of subparameters needed */
+    int have;
+    int n;
+
+    if ((have = param_has_subparams(item)) != 0) {
+	code = get_subparam(base, 1);
+	need = extended_colors_limit(code);
+	next = item + have;
+	for (n = 0; n < need && n < 3; ++n) {
+	    values[n] = get_subparam(base, 2 + n + (have > 4));
+	}
+    } else if (++item < nparam) {
+	++base;
+	if ((have = param_has_subparams(item)) != 0) {
+	    code = get_subparam(base, 0);
+	    need = extended_colors_limit(code);
+	    next = base + have;
+	    for (n = 0; n < need && n < 3; ++n) {
+		values[n] = get_subparam(base, 1 + n + (have > 3));
+	    }
+	} else {
+	    code = GetParam(item);
+	    need = extended_colors_limit(code);
+	    next = item + need;
+	    for (n = 0; n < need && n < 3; ++n) {
+		values[n] = GetParam(item + 1 + n);
+	    }
+	}
+    }
+    item = next;
+
+    *extended = False;
+    switch (code) {
+    case 2:
+	if ((values[0] >= 0 && values[0] < 256) &&
+	    (values[1] >= 0 && values[1] < 256) &&
+	    (values[2] >= 0 && values[2] < 256)) {
+#if OPT_DIRECT_COLOR
+	    if (TScreenOf(xw)->direct_color && xw->has_rgb) {
+		*colorp = getDirectColor(xw, values[0], values[1], values[2]);
+		result = True;
+		*extended = True;
+	    } else
+#endif
+	    {
+		*colorp = xtermClosestColor(xw, values[0], values[1], values[2]);
+		result = okIndexedColor(*colorp);
+	    }
+	} else {
+	    *colorp = -1;
+	}
+	break;
+    case 5:
+	*colorp = values[0];
+	result = okIndexedColor(*colorp);
+	break;
+    default:
+	*colorp = -1;
+	break;
+    }
+
+    TRACE(("...resulting color %d/%d %s\n",
+	   *colorp, NUM_ANSI_COLORS,
+	   result ? "OK" : "ERR"));
+
+    *itemp = item;
+    return result;
+}
+
+static void
+reset_SGR_Foreground(XtermWidget xw)
+{
+    xw->sgr_foreground = -1;
+    xw->sgr_38_xcolors = False;
+    clrDirectFG(xw->flags);
+    setExtendedFG(xw);
+}
+
+static void
+reset_SGR_Background(XtermWidget xw)
+{
+    xw->sgr_background = -1;
+    clrDirectBG(xw->flags);
+    setExtendedBG(xw);
+}
+
+static void
+set_tb_margins(TScreen *screen, int top, int bottom)
+{
+    TRACE(("set_tb_margins %d..%d, prior %d..%d\n",
+	   top, bottom,
+	   screen->top_marg,
+	   screen->bot_marg));
+    if (bottom > top) {
+	screen->top_marg = top;
+	screen->bot_marg = bottom;
+    }
+    if (screen->top_marg > screen->max_row)
+	screen->top_marg = screen->max_row;
+    if (screen->bot_marg > screen->max_row)
+	screen->bot_marg = screen->max_row;
+}
+
+static void
+set_lr_margins(TScreen *screen, int left, int right)
+{
+    TRACE(("set_lr_margins %d..%d, prior %d..%d\n",
+	   left, right,
+	   screen->lft_marg,
+	   screen->rgt_marg));
+    if (right > left) {
+	screen->lft_marg = left;
+	screen->rgt_marg = right;
+    }
+    if (screen->lft_marg > screen->max_col)
+	screen->lft_marg = screen->max_col;
+    if (screen->rgt_marg > screen->max_col)
+	screen->rgt_marg = screen->max_col;
+}
+
+static int
+only_default(void)
+{
+    return (nparam <= 1) && (GetParam(0) == DEFAULT);
+}
+
+static int
+use_default_value(int which, int default_value)
+{
+    int result = (nparam > which) ? GetParam(which) : default_value;
+    if (result <= 0)
+	result = default_value;
+    return result;
+}
+
+#if OPT_DEC_RECTOPS
+static DECNRCM_codes
+current_charset(TScreen *screen, int value)
+{
+    DECNRCM_codes result = nrc_ASCII;
+    if (IsLatin1(value)) {
+	if (screen->curss != 0) {
+	    result = screen->gsets[screen->curss];
+	} else if (value >= 0x80) {
+	    result = screen->gsets[screen->curgr];
+	} else {
+	    result = screen->gsets[screen->curgl];
+	}
+    }
+    return result;
+}
+#endif
+
+static int
+bitset(unsigned *p, unsigned mask)
+{
+    unsigned before = *p;
+    *p |= mask;
+    return (before != *p);
+}
+
+static int
+bitclr(unsigned *p, unsigned mask)
+{
+    unsigned before = *p;
+    *p &= ~mask;
+    return (before != *p);
+}
+
+static IChar
+doinput(XtermWidget xw)
+{
+    TScreen *screen = TScreenOf(xw);
+
+    while (!morePtyData(screen, VTbuffer))
+	in_put(xw);
+    return nextPtyData(screen, VTbuffer);
+}
+
+static void
+RequestResize(XtermWidget xw, int rows, int cols, Bool text)
+{
+    TScreen *screen = TScreenOf(xw);
+    Dimension replyWidth, replyHeight;
+    Dimension askedWidth, askedHeight;
+    XtGeometryResult status;
+    XWindowAttributes attrs;
+#if OPT_RENDERFONT && USE_DOUBLE_BUFFER
+    Boolean buggyXft = False;
+    Cardinal ignore = 0;
+#endif
+
+    TRACE(("RequestResize(rows=%d, cols=%d, text=%d)\n", rows, cols, text));
+#if OPT_STATUS_LINE
+    if (IsStatusShown(screen)) {
+	if (rows == -1) {
+	    rows = MaxRows(screen);
+	}
+	if (rows > 0) {
+	    TRACE(("...reserve a row for status-line\n"));
+	    ++rows;
+	}
+    }
+#endif
+
+    if (cols > 0) {
+	if ((int) (askedWidth = (Dimension) cols) < cols) {
+	    TRACE(("... cols too large for Dimension\n"));
+	    return;
+	}
+    } else {
+	askedWidth = 0;
+    }
+    if (rows > 0) {
+	if ((int) (askedHeight = (Dimension) rows) < rows) {
+	    TRACE(("... rows too large for Dimension\n"));
+	    return;
+	}
+    } else {
+	askedHeight = 0;
+    }
+
+    xw->work.doing_resize = True;
+
+#if OPT_RENDERFONT && USE_DOUBLE_BUFFER
+#define ToggleXft() HandleRenderFont((Widget)xw, (XEvent *)0, (String *)0, &ignore)
+    if (resource.buffered
+	&& UsingRenderFont(xw)) {
+	ToggleXft();
+	buggyXft = True;
+    }
+#endif
+
+    if (askedHeight == 0
+	|| askedWidth == 0
+	|| xw->misc.limit_resize > 0) {
+	xtermGetWinAttrs(XtDisplay(xw),
+			 RootWindowOfScreen(XtScreen(xw)), &attrs);
+    }
+
+    if (text) {
+	unsigned long value;
+
+	if ((value = (unsigned long) rows) != 0) {
+	    if (rows < 0)
+		value = (unsigned long) MaxRows(screen);
+	    value *= (unsigned long) FontHeight(screen);
+	    value += (unsigned long) (2 * screen->border);
+	    if (!okDimension(value, askedHeight))
+		goto give_up;
+	}
+
+	if ((value = (unsigned long) cols) != 0) {
+	    if (cols < 0)
+		value = (unsigned long) MaxCols(screen);
+	    value *= (unsigned long) FontWidth(screen);
+	    value += (unsigned long) ((2 * screen->border)
+				      + ScrollbarWidth(screen));
+	    if (!okDimension(value, askedWidth))
+		goto give_up;
+	}
+
+    } else {
+	if (rows < 0)
+	    askedHeight = FullHeight(screen);
+	if (cols < 0)
+	    askedWidth = FullWidth(screen);
+    }
+
+    if (rows == 0) {
+	askedHeight = (Dimension) attrs.height;
+    }
+    if (cols == 0) {
+	askedWidth = (Dimension) attrs.width;
+    }
+
+    if (xw->misc.limit_resize > 0) {
+	Dimension high = (Dimension) (xw->misc.limit_resize * attrs.height);
+	Dimension wide = (Dimension) (xw->misc.limit_resize * attrs.width);
+	if ((int) high < attrs.height)
+	    high = (Dimension) attrs.height;
+	if (askedHeight > high)
+	    askedHeight = high;
+	if ((int) wide < attrs.width)
+	    wide = (Dimension) attrs.width;
+	if (askedWidth > wide)
+	    askedWidth = wide;
+    }
+#ifndef nothack
+    getXtermSizeHints(xw);
+#endif
+
+    TRACE(("...requesting resize %dx%d (%dx%d)\n",
+	   askedHeight, askedWidth,
+	   askedHeight / FontHeight(screen),
+	   askedWidth / FontWidth(screen)));
+    status = REQ_RESIZE((Widget) xw,
+			askedWidth, askedHeight,
+			&replyWidth, &replyHeight);
+
+    if (status == XtGeometryYes ||
+	status == XtGeometryDone) {
+	ScreenResize(xw, replyWidth, replyHeight, &xw->flags);
+    }
+#ifndef nothack
+    if (xw->hints.flags
+	&& replyHeight
+	&& replyWidth) {
+	xw->hints.height = replyHeight;
+	xw->hints.width = replyWidth;
+
+	TRACE(("%s@%d -- ", __FILE__, __LINE__));
+	TRACE_HINTS(&xw->hints);
+	XSetWMNormalHints(screen->display, VShellWindow(xw), &xw->hints);
+	TRACE(("%s@%d -- ", __FILE__, __LINE__));
+	TRACE_WM_HINTS(xw);
+    }
+#endif
+
+    XSync(screen->display, False);
+    if (xtermAppPending()) {
+	xevents(xw);
+    }
+
+  give_up:
+#if OPT_RENDERFONT && USE_DOUBLE_BUFFER
+    if (buggyXft) {
+	ToggleXft();
+	if (xtermAppPending()) {
+	    xevents(xw);
+	}
+    }
+#endif
+
+    xw->work.doing_resize = False;
+
+    TRACE(("...RequestResize done\n"));
+    return;
+}
+
+static void
+dpmodes(XtermWidget xw, BitFunc func)
+{
+    /* TODO: Add full dpmodes implementation from charproc.c */
+    /* This is a very large function that handles DEC private modes */
+    (void) xw;
+    (void) func;
 }
