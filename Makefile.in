@@ -119,13 +119,13 @@ LUA_OBJS	= @LUA_OBJS@
 		  keysym2ucs.c linedata.c main.c menu.c misc.c \
 		  print.c ptydata.c scrollback.c \
 		  screen.c scrollbar.c tabs.c util.c version.c xstrings.c \
-		  xtermcap.c VTPrsTbl.c $(LUA_SRCS) $(EXTRASRC)
+		  xtermcap.c VTPrsTbl.c charproc/vt_parser.c charproc/blinking.c $(LUA_SRCS) $(EXTRASRC)
           OBJS1 = button$o cachedGCs$o charproc$o charsets$o cursor$o \
 	  	  data$o doublechr$o fontutils$o input$o \
 		  keysym2ucs$o linedata$o main$o menu$o misc$o \
 		  print$o ptydata$o scrollback$o \
 		  screen$o scrollbar$o tabs$o util$o version$o xstrings$o \
-		  xtermcap$o VTPrsTbl$o $(LUA_OBJS) $(EXTRAOBJ)
+		  xtermcap$o VTPrsTbl$o vt_parser$o blinking$o $(LUA_OBJS) $(EXTRAOBJ)
           SRCS2 = resize.c version.c xstrings.c
           OBJS2 = resize$o version$o xstrings$o
            SRCS = $(SRCS1) $(SRCS2)
@@ -233,6 +233,19 @@ Tekproc$o : $(TEKPARSE_H)
 misc$o : builtin_icons.h
 
 trace$o : VTparse.cin Tekparse.cin
+
+# Compilation rules for charproc subdirectory
+vt_parser$o : charproc/vt_parser.c
+	@RULE_CC@
+	@ECHO_CC@$(CC) $(CPPFLAGS) $(CFLAGS) -c $(srcdir)/charproc/vt_parser.c -o vt_parser$o
+
+blinking$o : charproc/blinking.c
+	@RULE_CC@
+	@ECHO_CC@$(CC) $(CPPFLAGS) $(CFLAGS) -c $(srcdir)/charproc/blinking.c -o blinking$o
+
+# Dependencies for charproc subdirectory files
+vt_parser$o : charproc/vt_parser.h charproc/includes.h xterm.h ptyx.h
+blinking$o : charproc/blinking.h xterm.h ptyx.h
 
 # do this to quiet gcc -Wcast-qual warnings
 builtin_icons.h :

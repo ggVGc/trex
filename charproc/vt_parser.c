@@ -114,8 +114,12 @@ typedef int (*BitFunc) (unsigned * /* p */ ,
 		    area = new_string; \
 		} \
 		size = new_length
+#define extended_colors_limit(n) ((n) == 5 ? 1 : ((n) == 2 ? 3 : 0))
+#define okDimension(src,dst) ((src <= MAX_U_COORD) \
+			  && ((dst = (Dimension) src) == src))
 
 /* Function declarations moved from charproc.c */
+static int init_params(void);
 static void init_reply(unsigned type);
 static void ansi_modes(XtermWidget xw, BitFunc func);
 static int param_has_subparams(int item);
@@ -151,6 +155,10 @@ static IChar doinput(XtermWidget xw);
 #if OPT_TRACE > 0
 static void dump_params(void);
 #endif
+static int subparam_index(int p, int s);
+static int param_number(int item);
+static int get_subparam(int p, int s);
+static void in_put(XtermWidget xw);
 
 static void
 init_groundtable(TScreen *screen, struct ParseState *sp)
@@ -4613,4 +4621,234 @@ dpmodes(XtermWidget xw, BitFunc func)
     /* This is a very large function that handles DEC private modes */
     (void) xw;
     (void) func;
+}
+
+/*
+ * Given a parameter number, and subparameter (starting in each case from zero)
+ * return the corresponding index into the parameter array.  If the combination
+ * is not found, return -1.
+ */
+static int
+subparam_index(int p, int s)
+{
+    int result = -1;
+    int j, p2, s2;
+
+    for (j = p2 = 0; j < nparam; ++j, ++p2) {
+	if (parms.is_sub[j]) {
+	    s2 = 0;
+
+	    do {
+		if ((p == p2) && (s == s2)) {
+		    result = j;
+		    break;
+		}
+		++s2;
+	    } while ((++j < nparam) && (parms.is_sub[j - 1] < parms.is_sub[j]));
+
+	    if (result >= 0)
+		break;
+
+	    --j;		/* undo the last "while" */
+	} else if (p == p2) {
+	    if (s == 0) {
+		result = j;
+	    }
+	    break;
+	}
+    }
+    TRACE2(("...subparam_index %d.%d = %d\n", p + 1, s + 1, result));
+    return result;
+}
+
+/*
+ * Given an index into the parameter array, return the corresponding parameter
+ * number (starting from zero).
+ */
+static int
+param_number(int item)
+{
+    int result = -1;
+    int j, p;
+
+    for (j = p = 0; j < nparam; ++j, ++p) {
+	if (j >= item) {
+	    result = p;
+	    break;
+	}
+	if (parms.is_sub[j]) {
+	    while ((++j < nparam) && (parms.is_sub[j - 1] < parms.is_sub[j])) {
+		/* EMPTY */
+	    }
+	    --j;
+	}
+    }
+
+    TRACE2(("...param_number(%d) = %d\n", item, result));
+    return result;
+}
+
+static int
+get_subparam(int p, int s)
+{
+    int item = subparam_index(p, s);
+    int result = (item >= 0) ? parms.params[item] : DEFAULT;
+    TRACE(("...get_subparam[%d] = %d\n", item, result));
+    return result;
+}
+
+static void
+in_put(XtermWidget xw)
+{
+    static PtySelect select_mask;
+    static PtySelect write_mask;
+
+    TScreen *screen = TScreenOf(xw);
+    int i;
+    int update = VTbuffer->update;
+#if USE_DOUBLE_BUFFER
+    int should_wait = 1;
+#endif
+    struct timeval my_timeout;
+
+    for (;;) {
+	int size;
+	int time_select;
+
+	if (screen->eventMode == NORMAL
+	    && (size = readPtyData(xw, &select_mask, VTbuffer)) != 0) {
+	    if (screen->scrollWidget
+		&& screen->scrollttyoutput
+		&& screen->topline < 0)
+		WindowScroll(xw, 0, False);	/* Scroll to bottom */
+	    /* stop speed reading at some point to look for X stuff */
+	    TRACE(("VTbuffer uses %ld/%d\n",
+		   (long) (VTbuffer->last - VTbuffer->buffer),
+		   BUF_SIZE));
+	    if ((VTbuffer->last - VTbuffer->buffer) > BUF_SIZE) {
+		FD_CLR(screen->respond, &select_mask);
+		break;
+	    }
+#if USE_DOUBLE_BUFFER
+	    if (resource.buffered && should_wait) {
+		/* wait for potential extra data (avoids some flickering) */
+		usleep((unsigned) DbeMsecs(xw));
+		should_wait = 0;
+	    }
+#endif
+#if defined(HAVE_SCHED_YIELD)
+	    /*
+	     * If we've read a full (small/fragment) buffer, let the operating
+	     * system have a turn, and we'll resume reading until we've either
+	     * read only a fragment of the buffer, or we've filled the large
+	     * buffer (see above).  Doing this helps keep up with large bursts
+	     * of output.
+	     */
+	    if (size == FRG_SIZE) {
+		init_timeval(&my_timeout, 0L);
+		i = Select(max_plus1, &select_mask, &write_mask, 0, &my_timeout);
+		if (i > 0 && FD_ISSET(screen->respond, &select_mask)) {
+		    sched_yield();
+		} else
+		    break;
+	    } else {
+		break;
+	    }
+#else
+	    (void) size;	/* unused in this branch */
+	    break;
+#endif
+	}
+	update_the_screen(xw);
+
+	XFlush(screen->display);	/* always flush writes before waiting */
+
+	/* Update the masks and, unless X events are already in the queue,
+	   wait for I/O to be possible. */
+	XFD_COPYSET(&Select_mask, &select_mask);
+	/* in selection mode xterm does not read pty */
+	if (screen->eventMode != NORMAL)
+	    FD_CLR(screen->respond, &select_mask);
+
+	if (v_bufptr > v_bufstr) {
+	    XFD_COPYSET(&pty_mask, &write_mask);
+	} else
+	    FD_ZERO(&write_mask);
+	init_timeval(&my_timeout, 0L);
+	time_select = 0;
+
+	/*
+	 * if there's either an XEvent or an XtTimeout pending, just take
+	 * a quick peek, i.e. timeout from the select() immediately.  If
+	 * there's nothing pending, let select() block a little while, but
+	 * for a shorter interval than the arrow-style scrollbar timeout.
+	 * The blocking is optional, because it tends to increase the load
+	 * on the host.
+	 */
+	if (xtermAppPending()) {
+	    time_select = 1;
+	} else {
+#define ImproveTimeout(usecs) \
+		struct timeval try_timeout; \
+		init_timeval(&try_timeout, usecs); \
+		if (better_timeout(&try_timeout, &my_timeout)) { \
+		    my_timeout = try_timeout; \
+		}
+#if OPT_STATUS_LINE
+	    if ((screen->status_type == 1) && screen->status_timeout) {
+		ImproveTimeout(find_SL_Timeout(xw) * 1000L);
+		time_select = 1;
+	    }
+#endif
+	    if (screen->awaitInput) {
+		ImproveTimeout(50000L);
+		time_select = 1;
+	    }
+#if OPT_BLINK_CURS
+	    if ((screen->blink_timer != 0 &&
+		 ((screen->select & FOCUS) || screen->always_highlight)) ||
+		(screen->cursor_state == BLINKED_OFF)) {
+		/*
+		 * Compute the timeout for the blinking cursor to be much
+		 * smaller than the "on" or "off" interval.
+		 */
+		long tick = smaller_timeout((long) ((screen->blink_on < screen->blink_off)
+						    ? screen->blink_on
+						    : screen->blink_off));
+		ImproveTimeout(tick);
+		time_select = 1;
+	    }
+#endif
+	}
+#if OPT_SESSION_MGT
+	if (resource.sessionMgt && (ice_fd >= 0)) {
+	    FD_SET(ice_fd, &select_mask);
+	}
+#endif
+	if (need_cleanup)
+	    NormalExit();
+	xtermFlushDbe(xw);
+	i = Select(max_plus1, &select_mask, &write_mask, 0,
+		   (time_select ? &my_timeout : NULL));
+	if (i < 0) {
+	    if (errno != EINTR)
+		SysError(ERROR_SELECT);
+	    continue;
+	}
+
+	/* if there is room to write more data to the pty, go write more */
+	if (FD_ISSET(screen->respond, &write_mask)) {
+	    v_write(screen->respond, (Char *) 0, (size_t) 0);	/* flush buffer */
+	}
+
+	/* if there are X events already in our queue, it
+	   counts as being readable */
+	if (xtermAppPending() ||
+	    FD_ISSET(ConnectionNumber(screen->display), &select_mask)) {
+	    xevents(xw);
+	    if (VTbuffer->update != update)	/* HandleInterpret */
+		break;
+	}
+
+    }
 }
