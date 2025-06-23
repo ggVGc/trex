@@ -132,7 +132,7 @@ LUA_OBJS	= @LUA_OBJS@
            OBJS = $(OBJS1) $(OBJS2)
            HDRS = VTparse.h data.h error.h fontutils.h main.h menu.h \
                   ptyx.h version.h xstrings.h xterm.h xtermcap.h $(EXTRAHDR)
-       PROGRAMS = xterm$x resize$x
+       PROGRAMS = trex$x resize$x
   TEST_PROGRAMS = test_charclass$x test_ptydata$x test_wcwidth$x
 
 all :	$(PROGRAMS)
@@ -196,7 +196,7 @@ misc$o : version.h
 $(OBJS1) : xterm.h ptyx.h fontutils.h menu.h xtermcfg.h
 main$o resize$o screen$o : xterm_io.h
 
-xterm$x : $(OBJS1)
+trex$x : $(OBJS1)
 	@ECHO_LD@$(SHELL) $(srcdir)/plink.sh $(LINK) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJS1) $(LIBS) $(EXTRA_LOADFLAGS)
 
 resize$x : $(OBJS2)
@@ -259,7 +259,7 @@ test_wcwidth$x : $(srcdir)/wcwidth.c
 	@ECHO_LD@$(SHELL) $(srcdir)/plink.sh $(CC) -o $@ $(CFLAGS) $(CPPFLAGS) -DTEST_DRIVER $(srcdir)/wcwidth.c $(LDFLAGS) $(LIBS)
 
 ################################################################################
-actual_xterm  = `echo xterm|        sed '$(transform)'`
+actual_xterm  = `echo trex|        sed '$(transform)'`
 actual_resize = `echo resize|       sed '$(transform)'`
 actual_uxterm = `echo uxterm|       sed '$(transform)'`
 actual_k8term = `echo koi8rxterm|   sed '$(transform)'`
@@ -271,9 +271,9 @@ binary_k8term = $(actual_k8term)
 
 install \
 install-bin \
-install-full :: xterm$x resize$x $(BINDIR)
-@MAY_SETUID@	$(SHELL) $(srcdir)/sinstall.sh @SINSTALL_OPTS@ "$(INSTALL_PROGRAM)" xterm$x  @XTERM_PATH@ $(BINDIR)/$(binary_xterm)
-@NOT_SETUID@	$(INSTALL_PROGRAM) xterm$x $(BINDIR)/$(binary_xterm)
+install-full :: trex$x resize$x $(BINDIR)
+@MAY_SETUID@	$(SHELL) $(srcdir)/sinstall.sh @SINSTALL_OPTS@ "$(INSTALL_PROGRAM)" trex$x  @XTERM_PATH@ $(BINDIR)/$(binary_xterm)
+@NOT_SETUID@	$(INSTALL_PROGRAM) trex$x $(BINDIR)/$(binary_xterm)
 	$(INSTALL_PROGRAM) -m  755 resize$x $(BINDIR)/$(binary_resize)
 
 EDIT_SCRIPT = sed -e s,=xterm,=\$$name, -e s,XTerm,$(CLASS),
@@ -321,7 +321,7 @@ install-full :: $(BINDIR)
 install \
 install-man \
 install-full :: $(MANDIR)
-	@-$(SHELL) -c "for source in xterm resize uxterm koi8rxterm ; \
+	@-$(SHELL) -c "for source in trex resize uxterm koi8rxterm ; \
 		do \
 			target=\`echo \"\$$source\" | sed '@program_transform_name@'\`; \
 			$(SHELL) ./minstall \"$(INSTALL_DATA)\" \
@@ -538,7 +538,7 @@ uninstall-full ::
 @no_pixmapdir@	@echo "... removed icons"
 ################################################################################
 # Desktop-utils does not provide an uninstall, and is not uniformly available.
-@desktop_utils@DESKTOP_FILES = $(srcdir)/xterm.desktop $(srcdir)/uxterm.desktop
+@desktop_utils@DESKTOP_FILES = $(srcdir)/trex.desktop $(srcdir)/uxterm.desktop
 @desktop_utils@DESKTOP_FLAGS = @DESKTOP_FLAGS@
 @desktop_utils@install-desktop \
 @desktop_utils@install-full ::
@@ -575,7 +575,7 @@ distclean :: clean
 distclean \
 docs-clean ::
 	-$(RM) *.ps *.pdf *.png
-	-$(SHELL) -c 'for p in xterm resize uxterm koi8rxterm; \
+	-$(SHELL) -c 'for p in trex resize uxterm koi8rxterm; \
 	do \
 		$(RM) $$p.html $$p.$(manext) $$p.txt; \
 	done'
@@ -609,12 +609,12 @@ resize.pdf : resize.ps
 resize.ps : resize.$(manext)
 resize.txt : resize.$(manext)
 ################################################################################
-docs-xterm \
-docs ::  xterm.txt @MAN2HTML_NOTE@ xterm.html @GROFF_NOTE@ xterm.pdf xterm.ps
-xterm.html : xterm.$(manext)
-xterm.pdf : xterm.ps
-xterm.ps : xterm.$(manext)
-xterm.txt : xterm.$(manext)
+docs-trex \
+docs ::  trex.txt @MAN2HTML_NOTE@ trex.html @GROFF_NOTE@ trex.pdf trex.ps
+trex.html : trex.$(manext)
+trex.pdf : trex.ps
+trex.ps : trex.$(manext)
+trex.txt : trex.$(manext)
 ################################################################################
 docs-uxterm \
 docs ::  uxterm.txt @MAN2HTML_NOTE@ uxterm.html @GROFF_NOTE@ uxterm.pdf uxterm.ps

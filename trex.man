@@ -30,9 +30,9 @@
 .\" ---------------------------------------------------------------------------
 .\" Updated by Thomas E. Dickey for XFree86, July 1996 - February 2006.
 .\"
-.TH XTERM 1 "__app_date__" "__app_version__" "X Window System"
-.ds N Xterm
-.ds n xterm
+.TH TREX 1 "__app_date__" "__app_version__" "X Window System"
+.ds N Trex
+.ds n trex
 .\"
 .\" Bulleted paragraph
 .de bP

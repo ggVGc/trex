@@ -31,14 +31,14 @@
 # authorization.
 # -----------------------------------------------------------------------------
 [Desktop Entry]
-Name=XTerm
+Name=TRex
 #GenericName=Terminal
 Comment=standard terminal emulator for the X window system
-Exec=xterm
+Exec=trex
 Terminal=false
 Type=Application
 Encoding=UTF-8
-Icon=xterm-color_48x48
+Icon=trex-color_48x48
 Categories=System;TerminalEmulator;
 Keywords=shell;prompt;command;commandline;cmd;
-StartupWMClass=XTerm
+StartupWMClass=TRex

@@ -39,3 +39,6 @@ Remove restrictions of dofile and loadfile
 
 PROMPT 14:
 Add the current working directory to package.path by dafault.
+
+PROMPT 15:
+Rename the binary from xterm to trex
