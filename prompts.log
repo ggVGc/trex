@@ -42,3 +42,6 @@ Add the current working directory to package.path by dafault.
 
 PROMPT 15:
 Rename the binary from xterm to trex
+
+PROMPT 16:
+Add $HOME/.local/share/xterm as an alternative directory for runtime files.

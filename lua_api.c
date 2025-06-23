@@ -795,6 +795,7 @@ static void
 lua_xterm_setup_trex_paths(lua_State *L)
 {
     char *cwd = NULL;
+    char *home_dir = NULL; 
     char *trex_path = NULL;
     size_t path_len;
     
@@ -805,34 +806,55 @@ lua_xterm_setup_trex_paths(lua_State *L)
         return;
     }
 
-    /* Create paths including current working directory and runtime subdirectories */
+    /* Get home directory */
+    home_dir = lua_xterm_get_home_dir();
+    if (home_dir == NULL) {
+        lua_xterm_debug("Failed to get home directory for trex paths");
+        free(cwd);
+        return;
+    }
+
+    /* Create paths including current working directory, runtime subdirectories, and home share directory */
     const char *patterns[] = {
         "/runtime/?.lua"
     };
     size_t num_patterns = sizeof(patterns) / sizeof(patterns[0]);
     
-    /* Calculate total length needed */
+    /* Calculate total length needed for both cwd and home paths */
     path_len = 1; /* for null terminator */
     for (size_t i = 0; i < num_patterns; i++) {
         path_len += strlen(cwd) + strlen(patterns[i]);
-        if (i > 0) path_len += 1; /* for semicolon */
+        path_len += strlen(home_dir) + strlen("/.local/share/xterm") + strlen(patterns[i]);
+        if (i > 0) path_len += 2; /* for semicolons */
     }
+    path_len += 1; /* for semicolon between cwd and home paths */
     
     trex_path = (char *) malloc(path_len);
     if (trex_path == NULL) {
         free(cwd);
+        free(home_dir);
         lua_xterm_debug("Failed to allocate memory for trex path");
         return;
     }
 
-    /* Build the complete path string */
+    /* Build the complete path string - first current working directory, then home directory */
     trex_path[0] = '\0';
     for (size_t i = 0; i < num_patterns; i++) {
         if (i > 0) strcat(trex_path, ";");
         strcat(trex_path, cwd);
         strcat(trex_path, patterns[i]);
     }
+    
+    /* Add home directory paths */
+    for (size_t i = 0; i < num_patterns; i++) {
+        strcat(trex_path, ";");
+        strcat(trex_path, home_dir);
+        strcat(trex_path, "/.local/share/trex");
+        strcat(trex_path, patterns[i]);
+    }
+    
     free(cwd);
+    free(home_dir);
 
     /* Set up package.path to include runtime directory */
     lua_getglobal(L, "package");
